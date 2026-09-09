@@ -218,29 +218,11 @@ label{
 .login-page::after{
   content:"";
   position:absolute;
-  z-index:0;
   border:1px solid rgba(130,226,247,.22);
   border-radius:50%;
   pointer-events:none;
   animation:rotateShape 28s linear infinite;
 }
-
-.login-box{
-  position:relative;
-  z-index:20;
-  pointer-events:auto;
-
-{.login-tabs,
-.login-tabs button,
-.login-form,
-#loginForm,
-#email,
-#accessCode{
-  position:relative;
-  z-index:30;
-  pointer-events:auto;
-}
-
 
 .login-page::before{
   width:600px;
@@ -897,8 +879,9 @@ tbody tr:last-child td{
 <p id="loginDescription">اختر نوع الدخول وأدخل رمز الدخول</p>
 
 <div class="login-tabs">
-<button type="button" id="adminTab" class="gray" onclick="selectLoginType('admin')">
-
+<button id="securityTab" onclick="selectLoginType('security')">دخول الأمن</button>
+<button id="permitsTab" class="gray" onclick="selectLoginType('permits')">دخول التصاريح</button>
+<button id="adminTab" class="gray" onclick="selectLoginType('admin')">دخول الإدارة</button>
 </div>
 
 <form id="loginForm">
@@ -1319,7 +1302,7 @@ $("loginForm").addEventListener("submit", async e => {
 
   const user = data.user;
 
-    if (loginType === "security") {
+  if (loginType === "security") {
     currentSecurityUser = {
       id: user.id,
       username: email
@@ -1336,7 +1319,6 @@ $("loginForm").addEventListener("submit", async e => {
     $("securityUserName").textContent =
       "مستخدم الأمن: " + email;
 
-    await loadAllData();
     refreshSecurity();
     return;
   }
@@ -1350,7 +1332,6 @@ $("loginForm").addEventListener("submit", async e => {
     $("loginPage").classList.add("hidden");
     $("permitsPage").classList.remove("hidden");
 
-    await loadAllData();
     renderPermitsPage();
     return;
   }
@@ -1364,11 +1345,9 @@ $("loginForm").addEventListener("submit", async e => {
     $("loginPage").classList.add("hidden");
     $("adminPage").classList.remove("hidden");
 
-    await loadAllData();
     renderAdminPage();
-    return;
   }
-
+});
 
 async function logout(){
   await supabaseClient.auth.signOut();
