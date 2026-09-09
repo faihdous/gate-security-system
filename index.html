@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>نظام أمن البوابات</title>
+
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 
 <style>
 :root{
@@ -1016,7 +1019,19 @@ tbody tr:last-child td{
 <div id="toast"></div>
 
 <script>
+const SUPABASE_URL =
+  "https://wejauffxldarkndhfddz.supabase.co";
+
+const SUPABASE_KEY =
+  "sb_publishable_wlElpM7I54Zgmusj8MODuQ_Etb543Yr";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
 const SECURITY_USERS=[
+
 {username:"علي",code:"1234"},
 {username:"عزيز",code:"5678"}
 ];
