@@ -879,10 +879,30 @@ tbody tr:last-child td{
 <p id="loginDescription">اختر نوع الدخول وأدخل رمز الدخول</p>
 
 <div class="login-tabs">
-<button id="securityTab" onclick="selectLoginType('security')">دخول الأمن</button>
-<button id="permitsTab" class="gray" onclick="selectLoginType('permits')">دخول التصاريح</button>
-<button id="adminTab" class="gray" onclick="selectLoginType('admin')">دخول الإدارة</button>
+  <button
+    type="button"
+    id="securityTab"
+    onclick="selectLoginType('security')">
+    دخول الأمن
+  </button>
+
+  <button
+    type="button"
+    id="permitsTab"
+    class="gray"
+    onclick="selectLoginType('permits')">
+    دخول التصاريح
+  </button>
+
+  <button
+    type="button"
+    id="adminTab"
+    class="gray"
+    onclick="selectLoginType('admin')">
+    دخول الإدارة
+  </button>
 </div>
+
 
 <form id="loginForm">
 <label>البريد الإلكتروني</label>
@@ -901,7 +921,8 @@ tbody tr:last-child td{
   required
 >
 
-<button style="width:100%;margin-top:16px">
+<button type="submit" style="width:100%;margin-top:16px">
+
   دخول النظام
 </button>
 
@@ -1187,7 +1208,7 @@ async function loadAllData(){
 }
 
 
-function clearAllReports(){
+async function clearAllReports(){
   if(!logs.length){
     toast("لا توجد تقارير لمسحها",false);
     return;
