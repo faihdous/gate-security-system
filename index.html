@@ -1180,7 +1180,29 @@ function dbToLog(row){
 }
 
 async function loadCustomFieldsFromSupabase(){
-  async function loadPeopleFromSupabase(){
+  const { data, error } = await supabaseClient
+    .from("custom_fields")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if(error){
+    console.error("خطأ تحميل الحقول:", error);
+    toast("تعذر تحميل الحقول من Supabase", false);
+    return;
+  }
+
+  customFields = (data || []).map(row => ({
+    id: row.id,
+    key: row.field_key,
+    label: row.field_label,
+    type: row.field_type,
+    required: row.is_required,
+    system: false,
+    active: row.is_active
+  }));
+}
+
+async function loadPeopleFromSupabase(){
   const { data, error } = await supabaseClient
     .from("permits")
     .select("*")
@@ -1195,7 +1217,6 @@ async function loadCustomFieldsFromSupabase(){
 
   people = (data || []).map(dbToPermit);
 }
-
 
 async function loadLogsFromSupabase(){
   const { data, error } = await supabaseClient
@@ -1217,7 +1238,6 @@ async function loadAllData(){
   await loadPeopleFromSupabase();
   await loadLogsFromSupabase();
 }
-
 
 
 
@@ -1525,13 +1545,11 @@ function renderPerson(p){
   `;
 }
 
-addLog
-  const newLog = async function addLog(x){
+async function addLog(x){
   const { data: userData } =
     await supabaseClient.auth.getUser();
 
   const userId = userData.user?.id || null;
-
   const isEntry = x.type === "دخول";
 
   const row = {
@@ -1560,8 +1578,6 @@ addLog
   const newLog = dbToLog(data);
   logs.unshift(newLog);
   return newLog;
-}
-
 }
 
 async function entry(){
@@ -1593,6 +1609,10 @@ async function entry(){
 }
 
 async function exit(){
+  if(!currentPerson){
+    return toast("لم يتم اختيار شخص", false);
+  }
+
   const l = logs.find(x =>
     x.date === localDateKey() &&
     x.civilId === currentPerson.civilId &&
@@ -1627,14 +1647,17 @@ async function exit(){
     new Date(exitTime).toLocaleTimeString("ar-KW");
 
   l.exitSecurityUser =
-    userData.user?.email || "غير محدد";
+    userData.user?.email || userData.user?.id || "غير محدد";
 
   refreshSecurity();
   toast("تم تسجيل الخروج بنجاح");
 }
 
-
 async function reject(){
+  if(!currentPerson){
+    return toast("لم يتم اختيار شخص", false);
+  }
+
   let r = prompt(
     "اكتب سبب رفض الدخول:",
     "التصريح غير مستوفٍ"
@@ -1643,8 +1666,8 @@ async function reject(){
   if(r === null) return;
 
   const result = await addLog({
-    civilId: currentPerson?.civilId || "",
-    name: currentPerson?.name || "غير مسجل",
+    civilId: currentPerson.civilId,
+    name: currentPerson.name,
     type: "محاولة دخول",
     status: "مرفوض",
     reason: r || "غير محدد"
@@ -1988,7 +2011,78 @@ async function saveEdit(e){
 
 function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
-function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople()}
+function renderAdminPage(){
+  const entries =
+    logs.filter(l => l.type === "دخول").length;
+
+  const exits =
+    logs.filter(l => l.exitTime).length;
+
+  const rejected =
+    logs.filter(l => l.status === "مرفوض").length;
+
+  const todayEntries =
+    logs.filter(l =>
+      l.date === localDateKey() &&
+      l.type === "دخول"
+    ).length;
+
+  $("adminTotalEntries").textContent = entries;
+  $("adminTotalExits").textContent = exits;
+  $("adminTotalRejected").textContent = rejected;
+  $("adminTodayEntries").textContent = todayEntries;
+
+  const users = [
+    ...new Set(
+      logs
+        .map(l => l.securityUser)
+        .filter(Boolean)
+    )
+  ];
+
+  $("securityUsersStats").innerHTML =
+    !users.length
+      ? `<div class="empty">لا توجد إحصائيات للمستخدمين</div>`
+      : `
+        <div class="table-wrapper">
+          <table>
+            <tr>
+              <th>المستخدم</th>
+              <th>الدخول</th>
+              <th>الخروج</th>
+              <th>المرفوض</th>
+            </tr>
+
+            ${users.map(user => `
+              <tr>
+                <td>${esc(user)}</td>
+                <td>
+                  ${logs.filter(l =>
+                    l.securityUser === user &&
+                    l.type === "دخول"
+                  ).length}
+                </td>
+                <td>
+                  ${logs.filter(l =>
+                    l.exitSecurityUser === user
+                  ).length}
+                </td>
+                <td>
+                  ${logs.filter(l =>
+                    l.securityUser === user &&
+                    l.status === "مرفوض"
+                  ).length}
+                </td>
+              </tr>
+            `).join("")}
+          </table>
+        </div>
+      `;
+
+  renderAdminLogs();
+  showInsidePeople();
+}
+
 
 
 function showInsidePeople(){
