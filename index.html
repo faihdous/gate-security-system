@@ -1069,14 +1069,7 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_KEY
 );
 
-const SECURITY_USERS=[
 
-{username:"علي",code:"1234"},
-{username:"عزيز",code:"5678"}
-];
-
-const PERMITS_CODE="permit123";
-const ADMIN_CODE="admin123";
 
 const BASE_FIELDS=[
 {key:"civilId",label:"الرقم المدني",type:"text",required:true,system:true},
@@ -1187,28 +1180,7 @@ function dbToLog(row){
 }
 
 async function loadCustomFieldsFromSupabase(){
-  const { data, error } = await supabaseClient
-    .from("custom_fields")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if(error){
-    console.error("خطأ تحميل الحقول:", error);
-    toast("تعذر تحميل الحقول من Supabase", false);
-    return;
-  }
-
-  customFields = (data || []).map(row => ({
-    id: row.id,
-    key: row.field_key,
-    label: row.field_label,
-    type: row.field_type,
-    required: row.is_required,
-    system: false,
-    active: row.is_active
-  }));
-}
-
+  async function loadPeopleFromSupabase(){
   const { data, error } = await supabaseClient
     .from("permits")
     .select("*")
@@ -1223,6 +1195,7 @@ async function loadCustomFieldsFromSupabase(){
 
   people = (data || []).map(dbToPermit);
 }
+
 
 async function loadLogsFromSupabase(){
   const { data, error } = await supabaseClient
@@ -1240,12 +1213,11 @@ async function loadLogsFromSupabase(){
 }
 
 async function loadAllData(){
-  await Promise.all([
-    loadPeopleFromSupabase(),
-    loadLogsFromSupabase(),
-    loadCustomFieldsFromSupabase()
-  ]);
+  await loadCustomFieldsFromSupabase();
+  await loadPeopleFromSupabase();
+  await loadLogsFromSupabase();
 }
+
 
 
 
@@ -1403,16 +1375,18 @@ return;
   }
 
   if (loginType === "admin") {
-    sessionStorage.setItem(
-      "gateAdminLoggedIn",
-      "true"
-    );
+  sessionStorage.setItem(
+    "gateAdminLoggedIn",
+    "true"
+  );
 
-    $("loginPage").classList.add("hidden");
-    $("adminPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("adminPage").classList.remove("hidden");
 
-    renderAdminPage();
-  }
+  await loadAllData();
+  renderAdminPage();
+}
+
 });
 
 async function logout(){
@@ -1552,9 +1526,42 @@ function renderPerson(p){
 }
 
 addLog
+  const newLog = async function addLog(x){
+  const { data: userData } =
+    await supabaseClient.auth.getUser();
+
+  const userId = userData.user?.id || null;
+
+  const isEntry = x.type === "دخول";
+
+  const row = {
+    permit_id: currentPerson?.id || null,
+    civil_id: x.civilId || currentPerson?.civilId || "",
+    person_name: x.name || currentPerson?.name || "غير مسجل",
+    operation_type: isEntry ? "entry" : "rejected",
+    status: isEntry ? "accepted" : "rejected",
+    reason: x.reason || "",
+    entry_time: new Date().toISOString(),
+    entry_by: userId
+  };
+
+  const { data, error } = await supabaseClient
+    .from("gate_logs")
+    .insert(row)
+    .select()
+    .single();
+
+  if(error){
+    console.error(error);
+    toast("تعذر حفظ العملية: " + error.message, false);
+    return null;
+  }
+
   const newLog = dbToLog(data);
   logs.unshift(newLog);
   return newLog;
+}
+
 }
 
 async function entry(){
@@ -1586,7 +1593,7 @@ async function entry(){
 }
 
 async function exit(){
-  let l = logs.find(x =>
+  const l = logs.find(x =>
     x.date === localDateKey() &&
     x.civilId === currentPerson.civilId &&
     x.type === "دخول" &&
@@ -1597,17 +1604,17 @@ async function exit(){
     return toast("لا يوجد دخول مفتوح", false);
   }
 
-  const user = await supabaseClient.auth.getUser();
+  const { data: userData } =
+    await supabaseClient.auth.getUser();
+
   const exitTime = new Date().toISOString();
 
   const { error } = await supabaseClient
     .from("gate_logs")
     .update({
-      .update({
-  exit_time: exitTime,
-  exit_by: user.data.user?.id || null
-})
-
+      exit_time: exitTime,
+      exit_by: userData.user?.id || null
+    })
     .eq("id", l.id);
 
   if(error){
@@ -1616,16 +1623,16 @@ async function exit(){
   }
 
   l.exitTime = exitTime;
-  l.exitTimeText = new Date(exitTime)
-    .toLocaleTimeString("ar-KW");
+  l.exitTimeText =
+    new Date(exitTime).toLocaleTimeString("ar-KW");
 
   l.exitSecurityUser =
-  user.data.user?.email || "غير محدد";
-
+    userData.user?.email || "غير محدد";
 
   refreshSecurity();
   toast("تم تسجيل الخروج بنجاح");
 }
+
 
 async function reject(){
   let r = prompt(
@@ -1719,22 +1726,7 @@ $("permitForm").addEventListener("submit", async e => {
   toast("تم حفظ التصريح بنجاح");
 });
 
-  .from("permits")
-  .insert(permitToDb(p))
-  .select()
-  .single();
-
-if(error){
-  console.error(error);
-  return toast("تعذر حفظ التصريح: " + error.message, false);
-}
-
-people.unshift(dbToPermit(data));
-
-e.target.reset();
-renderPermitsPage();
-toast("تم حفظ التصريح بنجاح");
-})
+ 
 async function addCustomField(){
   const label = $("newFieldName").value.trim();
 
@@ -1807,12 +1799,13 @@ async function toggleField(k){
 
   renderPermitsPage();
 
-  toast(
+    toast(
     newStatus ? "تمت إعادة تفعيل الحقل" : "تم إلغاء الحقل"
   );
+}
 
+async function deleteCustomField(k){
 
-  async function deleteCustomField(k){
   const field = customFields.find(f => f.key === k);
 
   if(!field){
@@ -1907,7 +1900,16 @@ function renderFields(){
 }
 
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
-function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
+function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields()
+  .map(f => makeInput(
+    f,
+    "edit_",
+    f.system
+      ? p[f.key]
+      : p.customData?.[f.key] || ""
+  ))
+  .join("")
+}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
 async function saveEdit(e){
   e.preventDefault();
 
