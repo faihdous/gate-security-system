@@ -885,11 +885,29 @@ tbody tr:last-child td{
 </div>
 
 <form id="loginForm">
-<label>رمز الدخول</label>
-<input id="accessCode" type="password" placeholder="أدخل رمز الدخول" required>
-<button style="width:100%;margin-top:16px">دخول النظام</button>
+<label>البريد الإلكتروني</label>
+<input
+  id="email"
+  type="email"
+  placeholder="أدخل البريد الإلكتروني"
+  required
+>
+
+<label>كلمة المرور</label>
+<input
+  id="accessCode"
+  type="password"
+  placeholder="أدخل كلمة المرور"
+  required
+>
+
+<button style="width:100%;margin-top:16px">
+  دخول النظام
+</button>
+
 <div id="loginError" class="error"></div>
 </form>
+
 </div>
 </section>
 
@@ -1130,32 +1148,152 @@ function allFields(){return[...BASE_FIELDS,...customFields]}
 function activeFields(){return allFields().filter(f=>!disabledFields.includes(f.key))}
 function toast(m,ok=true){$("toast").textContent=m;$("toast").style.background=ok?"#087b42":"#b52323";$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3000)}
 function selectLoginType(t){
-loginType=t;
-$("securityTab").classList.toggle("gray",t!=="security");
-$("permitsTab").classList.toggle("gray",t!=="permits");
-$("adminTab").classList.toggle("gray",t!=="admin");
-$("loginDescription").textContent=t==="security"?"أدخل رمز دخول مستخدم الأمن":t==="permits"?"أدخل رمز الدخول إلى صفحة التصاريح":"أدخل رمز الدخول إلى الصفحة الإدارية";
-$("accessCode").value="";$("loginError").textContent=""
+  loginType = t;
+
+  $("securityTab").classList.toggle(
+    "gray",
+    t !== "security"
+  );
+
+  $("permitsTab").classList.toggle(
+    "gray",
+    t !== "permits"
+  );
+
+  $("adminTab").classList.toggle(
+    "gray",
+    t !== "admin"
+  );
+
+  $("loginDescription").textContent =
+    t === "security"
+      ? "أدخل البريد الإلكتروني وكلمة المرور لمستخدم الأمن"
+      : t === "permits"
+        ? "أدخل البريد الإلكتروني وكلمة المرور لمسؤول التصاريح"
+        : "أدخل البريد الإلكتروني وكلمة المرور لمسؤول الإدارة";
+
+  $("email").value = "";
+  $("accessCode").value = "";
+  $("loginError").textContent = "";
 }
-function findUser(c){return SECURITY_USERS.find(u=>u.code===c)}
-$("loginForm").addEventListener("submit",e=>{
-e.preventDefault();let c=$("accessCode").value.trim();
-if(loginType==="security"){
-let u=findUser(c);if(!u){$("loginError").textContent="رمز دخول الأمن غير صحيح";return}
-currentSecurityUser=u;sessionStorage.setItem("gateSecurityUser",JSON.stringify(u));
-$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");
-$("securityUserName").textContent="مستخدم الأمن: "+u.username;refreshSecurity();return
-}
-if(loginType==="permits"){
-if(c!==PERMITS_CODE){$("loginError").textContent="رمز دخول التصاريح غير صحيح";return}
-sessionStorage.setItem("gatePermitsLoggedIn","true");$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return
-}
-if(c!==ADMIN_CODE){$("loginError").textContent="رمز دخول الإدارة غير صحيح";return}
-sessionStorage.setItem("gateAdminLoggedIn","true");$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()
+
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const email = $("email").value.trim();
+  const password = $("accessCode").value.trim();
+
+  if (!email || !password) {
+    $("loginError").textContent =
+      "أدخل البريد الإلكتروني وكلمة المرور";
+    return;
+  }
+
+  $("loginError").textContent = "جاري تسجيل الدخول...";
+
+  const { data, error } =
+    await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+  if (error) {
+    console.error(error);
+    $("loginError").textContent =
+      "البريد الإلكتروني أو كلمة المرور غير صحيحة";
+    return;
+  }
+
+  const user = data.user;
+
+  if (loginType === "security") {
+    currentSecurityUser = {
+      id: user.id,
+      username: email
+    };
+
+    sessionStorage.setItem(
+      "gateSecurityUser",
+      JSON.stringify(currentSecurityUser)
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("securityPage").classList.remove("hidden");
+
+    $("securityUserName").textContent =
+      "مستخدم الأمن: " + email;
+
+    refreshSecurity();
+    return;
+  }
+
+  if (loginType === "permits") {
+    sessionStorage.setItem(
+      "gatePermitsLoggedIn",
+      "true"
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("permitsPage").classList.remove("hidden");
+
+    renderPermitsPage();
+    return;
+  }
+
+  if (loginType === "admin") {
+    sessionStorage.setItem(
+      "gateAdminLoggedIn",
+      "true"
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
+
+    renderAdminPage();
+  }
 });
-function logout(){sessionStorage.removeItem("gateSecurityUser");currentSecurityUser=null;$("securityPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("security")}
-function permitsLogout(){sessionStorage.removeItem("gatePermitsLoggedIn");$("permitsPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("permits")}
-function adminLogout(){sessionStorage.removeItem("gateAdminLoggedIn");$("adminPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("admin")}
+
+async function logout(){
+  await supabaseClient.auth.signOut();
+
+  sessionStorage.removeItem("gateSecurityUser");
+  sessionStorage.removeItem("gatePermitsLoggedIn");
+  sessionStorage.removeItem("gateAdminLoggedIn");
+
+  currentSecurityUser = null;
+
+  $("securityPage").classList.add("hidden");
+  $("loginPage").classList.remove("hidden");
+
+  selectLoginType("security");
+}
+
+async function permitsLogout(){
+  await supabaseClient.auth.signOut();
+
+  sessionStorage.removeItem("gateSecurityUser");
+  sessionStorage.removeItem("gatePermitsLoggedIn");
+  sessionStorage.removeItem("gateAdminLoggedIn");
+
+  $("permitsPage").classList.add("hidden");
+  $("loginPage").classList.remove("hidden");
+
+  selectLoginType("permits");
+}
+
+async function adminLogout(){
+  await supabaseClient.auth.signOut();
+
+  sessionStorage.removeItem("gateSecurityUser");
+  sessionStorage.removeItem("gatePermitsLoggedIn");
+  sessionStorage.removeItem("gateAdminLoggedIn");
+
+  $("adminPage").classList.add("hidden");
+  $("loginPage").classList.remove("hidden");
+
+  selectLoginType("admin");
+}
+
 function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
 function searchPerson(){let c=$("civilId").value.trim(),p=people.find(x=>x.civilId===c);if(!c){toast("أدخل الرقم المدني أولًا",false);return}if(!p){currentPerson=null;$("personResult").classList.remove("hidden");$("personResult").innerHTML=`<div><h2>لا يوجد تصريح</h2><p>لم يتم العثور على الرقم المدني: <b>${esc(c)}</b></p><button class="red" onclick="unknownReject('${esc(c)}')">تسجيل محاولة مرفوضة</button></div>`;return}currentPerson=p;renderPerson(p)}
 function renderPerson(p){
