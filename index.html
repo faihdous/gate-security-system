@@ -505,9 +505,6 @@ main{
   display:block;
 }
 
-
-
-
 .info-item{
   padding:14px;
   border:1px solid #dfedf2;
@@ -1198,7 +1195,7 @@ function renderPerson(p){
             <b>صورة البطاقة المدنية</b>
             <img
               class="document-image"
-              src="${p.cardImage||cardPlaceholder()}"
+              src="${esc(p.cardImage||cardPlaceholder())}"
               alt="صورة البطاقة المدنية"
             >
           </div>
