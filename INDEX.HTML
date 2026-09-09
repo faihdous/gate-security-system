@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نظام أمن البوابات</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --navy:#031426;
+  --navy-2:#082b4b;
+  --blue:#0b4f83;
+  --blue-2:#137db4;
+  --cyan:#19c4e8;
+  --cyan-soft:#dff8ff;
+  --green:#087b42;
+  --red:#b52323;
+  --orange:#d58a00;
+  --gray:#65747d;
+  --bg:#eef7fb;
+  --text:#172633;
+  --muted:#728491;
+  --border:#d8e8ef;
+  --white:#fff;
+  --shadow:0 18px 45px rgba(3,35,62,.12);
+  --shadow-hover:0 24px 55px rgba(3,35,62,.2);
+  --glass:rgba(255,255,255,.78);
+}
+
+*{
+  box-sizing:border-box;
+  font-family:Tahoma,Arial,sans-serif;
+}
+
+html{
+  scroll-behavior:smooth;
+}
+
+body{
+  min-height:100vh;
+  margin:0;
+  color:var(--text);
+  overflow-x:hidden;
+  background:
+    radial-gradient(circle at 8% 8%,rgba(25,196,232,.2),transparent 25%),
+    radial-gradient(circle at 92% 86%,rgba(49,201,132,.16),transparent 25%),
+    linear-gradient(135deg,#eef8fc 0%,#e3f1f7 45%,#f5fbfd 100%);
+}
+
+body::before,
+body::after{
+  content:"";
+  position:fixed;
+  z-index:-1;
+  pointer-events:none;
+  border-radius:50%;
+  filter:blur(2px);
+  opacity:.5;
+  animation:floatShape 13s ease-in-out infinite alternate;
+}
+
+body::before{
+  width:380px;
+  height:380px;
+  top:9%;
+  left:-190px;
+  background:radial-gradient(circle at 35% 35%,rgba(25,196,232,.35),transparent 68%);
+}
+
+body::after{
+  width:430px;
+  height:430px;
+  right:-220px;
+  bottom:-100px;
+  background:radial-gradient(circle at 45% 40%,rgba(39,194,126,.28),transparent 68%);
+  animation-delay:2s;
+}
+
+.hidden{
+  display:none!important;
+}
+
+button,
+input,
+textarea{
+  font:inherit;
+}
+
+button{
+  position:relative;
+  min-height:45px;
+  padding:11px 19px;
+  overflow:hidden;
+  border:0;
+  border-radius:13px;
+  color:#fff;
+  background:linear-gradient(135deg,var(--blue),var(--blue-2));
+  box-shadow:0 8px 18px rgba(11,61,107,.2);
+  cursor:pointer;
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease,
+    filter .25s ease;
+}
+
+button::after{
+  content:"";
+  position:absolute;
+  top:0;
+  left:-80%;
+  width:50%;
+  height:100%;
+  transform:skewX(-20deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+  transition:left .55s ease;
+}
+
+button:hover{
+  transform:translateY(-3px);
+  box-shadow:0 14px 28px rgba(11,61,107,.27);
+  filter:saturate(1.08);
+}
+
+button:hover::after{
+  left:130%;
+}
+
+button:active{
+  transform:translateY(-1px) scale(.98);
+}
+
+button:disabled{
+  opacity:.55;
+  background:#8999a2;
+  box-shadow:none;
+  cursor:not-allowed;
+  transform:none;
+}
+
+.green{
+  background:linear-gradient(135deg,#057139,#13b965);
+}
+
+.red{
+  background:linear-gradient(135deg,#971717,#dc3c3c);
+}
+
+.orange{
+  background:linear-gradient(135deg,#a96900,#edae1b);
+}
+
+.gray{
+  background:linear-gradient(135deg,#536771,#889ba5);
+}
+
+input,
+textarea{
+  width:100%;
+  padding:14px 15px;
+  border:1px solid var(--border);
+  border-radius:13px;
+  outline:0;
+  color:var(--text);
+  background:rgba(255,255,255,.92);
+  box-shadow:inset 0 1px 2px rgba(10,52,80,.03);
+  transition:
+    border-color .25s ease,
+    box-shadow .25s ease,
+    transform .25s ease,
+    background .25s ease;
+}
+
+input:hover,
+textarea:hover{
+  border-color:#b9d7e4;
+  background:#fff;
+}
+
+input:focus,
+textarea:focus{
+  border-color:var(--cyan);
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(25,196,232,.14),0 8px 18px rgba(12,79,115,.08);
+  transform:translateY(-2px);
+}
+
+textarea{
+  min-height:105px;
+  resize:vertical;
+}
+
+label{
+  display:block;
+  margin:12px 0 7px;
+  color:var(--blue);
+  font-weight:bold;
+}
+
+.login-page{
+  position:relative;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:25px;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 20% 15%,rgba(25,196,232,.22),transparent 25%),
+    radial-gradient(circle at 85% 85%,rgba(29,175,112,.18),transparent 28%),
+    linear-gradient(135deg,#021021 0%,#062846 48%,#0b4d78 100%);
+}
+
+.login-page::before,
+.login-page::after{
+  content:"";
+  position:absolute;
+  border:1px solid rgba(130,226,247,.22);
+  border-radius:50%;
+  pointer-events:none;
+  animation:rotateShape 28s linear infinite;
+}
+
+.login-page::before{
+  width:600px;
+  height:600px;
+  box-shadow:0 0 0 25px rgba(255,255,255,.025),0 0 0 70px rgba(255,255,255,.018);
+}
+
+.login-page::after{
+  width:880px;
+  height:880px;
+  animation-direction:reverse;
+  border-color:rgba(130,226,247,.13);
+}
+
+.login-box{
+  position:relative;
+  z-index:1;
+  width:100%;
+  max-width:470px;
+  padding:36px 32px 31px;
+  overflow:hidden;
+  text-align:center;
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:30px;
+  background:rgba(255,255,255,.93);
+  box-shadow:0 30px 90px rgba(0,0,0,.42),0 0 0 8px rgba(255,255,255,.05);
+  backdrop-filter:blur(18px);
+  animation:loginEnter .8s cubic-bezier(.2,.75,.2,1) both;
+}
+
+.login-box::before{
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  left:0;
+  height:5px;
+  background:linear-gradient(90deg,var(--cyan),#fff,var(--green));
+  background-size:200% 100%;
+  animation:gradientMove 5s linear infinite;
+}
+
+.logo{
+  width:145px;
+  height:145px;
+  display:block;
+  margin:auto;
+  object-fit:contain;
+  filter:drop-shadow(0 12px 16px rgba(4,48,76,.22));
+  animation:logoFloat 4.5s ease-in-out infinite;
+}
+
+.login-box h1{
+  margin:17px 0 9px;
+  color:var(--blue);
+  font-size:27px;
+  letter-spacing:-.5px;
+}
+
+.login-box p{
+  margin:0;
+  color:var(--muted);
+}
+
+.login-tabs{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:9px;
+  margin:24px 0 19px;
+}
+
+.login-tabs button{
+  min-height:47px;
+  padding:10px 8px;
+  font-size:13px;
+}
+
+.error{
+  min-height:24px;
+  margin-top:12px;
+  color:var(--red);
+  font-weight:bold;
+  animation:shake .35s ease;
+}
+
+header{
+  position:sticky;
+  top:0;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:22px;
+  min-height:94px;
+  padding:14px 34px;
+  color:#fff;
+  background:
+    linear-gradient(115deg,rgba(2,17,34,.98),rgba(8,63,102,.97)),
+    radial-gradient(circle at 80% 0%,rgba(25,196,232,.28),transparent 35%);
+  box-shadow:0 10px 30px rgba(3,28,52,.28);
+  backdrop-filter:blur(12px);
+}
+
+header::after{
+  content:"";
+  position:absolute;
+  right:0;
+  bottom:0;
+  left:0;
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:.8;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:15px;
+}
+
+.brand img{
+  width:69px;
+  height:69px;
+  padding:4px;
+  object-fit:contain;
+  border:3px solid rgba(255,255,255,.9);
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 0 0 5px rgba(255,255,255,.09),0 9px 22px rgba(0,0,0,.25);
+  animation:logoFloat 4.5s ease-in-out infinite;
+}
+
+.brand h2{
+  margin:0 0 5px;
+  font-size:22px;
+}
+
+.brand small{
+  color:#cce9f5;
+}
+
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  font-weight:bold;
+}
+
+.logout{
+  border:1px solid rgba(255,255,255,.55);
+  background:rgba(255,255,255,.1);
+  box-shadow:none;
+}
+
+.logout:hover{
+  background:rgba(255,255,255,.2);
+  box-shadow:0 8px 20px rgba(0,0,0,.18);
+}
+
+main{
+  max-width:1320px;
+  margin:34px auto;
+  padding:0 20px;
+  animation:pageEnter .65s ease both;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:18px;
+  margin-bottom:25px;
+}
+
+.stat,
+.card{
+  border:1px solid rgba(207,226,235,.88);
+  border-radius:21px;
+  background:var(--glass);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(13px);
+}
+
+.stat{
+  position:relative;
+  min-height:125px;
+  padding:23px;
+  overflow:hidden;
+  transition:transform .3s ease,box-shadow .3s ease;
+}
+
+.stat::before{
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  width:6px;
+  height:100%;
+  background:linear-gradient(180deg,var(--cyan),var(--blue-2));
+}
+
+.stat::after{
+  content:"";
+  position:absolute;
+  left:-45px;
+  bottom:-65px;
+  width:150px;
+  height:150px;
+  border-radius:50%;
+  background:rgba(25,196,232,.1);
+}
+
+.stat:hover{
+  transform:translateY(-7px);
+  box-shadow:var(--shadow-hover);
+}
+
+.stat span{
+  position:relative;
+  z-index:1;
+  color:var(--muted);
+  font-size:14px;
+}
+
+.stat strong{
+  position:relative;
+  z-index:1;
+  display:block;
+  margin-top:10px;
+  color:var(--blue);
+  font-size:33px;
+  letter-spacing:.5px;
+}
+
+.card{
+  position:relative;
+  padding:25px;
+  margin-bottom:24px;
+  animation:cardEnter .65s ease both;
+}
+
+.card::before{
+  content:"";
+  position:absolute;
+  top:0;
+  right:25px;
+  left:25px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(25,196,232,.48),transparent);
+}
+
+.card h2{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  margin:0 0 19px;
+  color:var(--blue);
+  font-size:20px;
+}
+
+.card h2::before{
+  content:"";
+  width:7px;
+  height:28px;
+  border-radius:10px;
+  background:linear-gradient(180deg,var(--cyan),var(--blue-2));
+  box-shadow:0 4px 12px rgba(25,196,232,.28);
+}
+
+.search-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:11px;
+}
+
+.form-grid,
+.info-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:15px;
+}
+
+.person{
+  display:grid;
+  grid-template-columns:220px 1fr;
+  gap:30px;
+}
+
+.person-photo{
+  width:195px;
+  height:225px;
+  object-fit:cover;
+  border:5px solid #fff;
+  border-radius:19px;
+  background:#eaf0f4;
+  box-shadow:0 13px 28px rgba(8,61,107,.22);
+  transition:transform .35s ease,box-shadow .35s ease;
+}
+
+.person-photo:hover{
+  transform:scale(1.035) rotate(-1deg);
+  box-shadow:0 18px 35px rgba(8,61,107,.28);
+}
+
+.info-item{
+  padding:14px;
+  border:1px solid #dfedf2;
+  border-radius:13px;
+  background:linear-gradient(135deg,rgba(250,253,254,.95),rgba(235,246,250,.85));
+  transition:transform .25s ease,border-color .25s ease;
+}
+
+.info-item:hover{
+  transform:translateY(-3px);
+  border-color:#b9dce8;
+}
+
+.info-item b{
+  display:block;
+  margin-bottom:7px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.status{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 14px;
+  border-radius:22px;
+  font-size:13px;
+  font-weight:bold;
+}
+
+.status::before{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:0 0 0 0 currentColor;
+  animation:pulseStatus 1.8s infinite;
+}
+
+.active{
+  color:#08723b;
+  background:#d8f3e3;
+}
+
+.expired,
+.rejected{
+  color:#9d1d1d;
+  background:#ffe0e0;
+}
+
+.warning{
+  color:#856300;
+  background:#fff0c6;
+}
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:21px;
+}
+
+.document{
+  margin-top:21px;
+  padding-top:18px;
+  border-top:1px solid var(--border);
+}
+
+.document-image{
+  display:block;
+  width:280px;
+  max-width:100%;
+  margin-top:11px;
+  border:4px solid #fff;
+  border-radius:14px;
+  box-shadow:0 10px 22px rgba(0,0,0,.13);
+}
+
+.upload-preview{
+  display:block;
+  width:155px;
+  height:125px;
+  object-fit:cover;
+  margin-top:10px;
+  border:3px solid #fff;
+  border-radius:13px;
+  box-shadow:0 7px 16px rgba(0,0,0,.12);
+}
+
+.hint{
+  margin-top:11px;
+  color:var(--muted);
+  font-size:13px;
+}
+
+.hint b{
+  color:var(--blue);
+}
+
+.field-list{
+  display:grid;
+  gap:11px;
+}
+
+.field-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:13px;
+  padding:15px;
+  border:1px solid #dfebf0;
+  border-radius:14px;
+  background:rgba(247,251,253,.85);
+  transition:transform .25s ease,background .25s ease,border-color .25s ease;
+}
+
+.field-row:hover{
+  transform:translateX(-5px);
+  border-color:#b8dce8;
+  background:#edf8fc;
+}
+
+.field-row small{
+  display:block;
+  margin-top:5px;
+  color:var(--muted);
+}
+
+.field-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.field-actions button{
+  min-height:38px;
+  padding:8px 13px;
+  font-size:13px;
+}
+
+.table-wrapper{
+  overflow-x:auto;
+  border:1px solid #dfebf0;
+  border-radius:15px;
+  box-shadow:0 5px 18px rgba(3,43,70,.05);
+}
+
+table{
+  width:100%;
+  min-width:850px;
+  border-collapse:separate;
+  border-spacing:0;
+  overflow:hidden;
+}
+
+th,
+td{
+  padding:14px 11px;
+  border-bottom:1px solid var(--border);
+  text-align:right;
+  font-size:13px;
+}
+
+th{
+  color:#fff;
+  background:linear-gradient(135deg,var(--navy-2),var(--blue-2));
+  white-space:nowrap;
+}
+
+tbody tr{
+  transition:background .2s ease,transform .2s ease;
+}
+
+tbody tr:hover{
+  background:#eef9fc;
+}
+
+tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.empty{
+  padding:32px;
+  color:var(--muted);
+  text-align:center;
+  border:2px dashed #cfe1e9;
+  border-radius:14px;
+  background:rgba(250,253,254,.55);
+}
+
+.edit-box{
+  margin-top:21px;
+  padding:21px;
+  border:2px solid #cce4ed;
+  border-radius:17px;
+  background:linear-gradient(135deg,rgba(249,253,254,.96),rgba(233,246,251,.9));
+  box-shadow:0 10px 25px rgba(3,60,90,.07);
+  animation:cardEnter .5s ease both;
+}
+
+.edit-box h3{
+  margin:0 0 17px;
+  color:var(--blue);
+}
+
+#toast{
+  display:none;
+  position:fixed;
+  right:24px;
+  bottom:24px;
+  z-index:30;
+  max-width:calc(100% - 48px);
+  padding:16px 21px;
+  color:#fff;
+  border-radius:14px;
+  font-weight:bold;
+  box-shadow:0 15px 35px rgba(0,0,0,.25);
+  animation:toastEnter .35s ease both;
+}
+
+@keyframes loginEnter{
+  from{opacity:0;transform:translateY(30px) scale(.95)}
+  to{opacity:1;transform:none}
+}
+
+@keyframes pageEnter{
+  from{opacity:0;transform:translateY(15px)}
+  to{opacity:1;transform:none}
+}
+
+@keyframes cardEnter{
+  from{opacity:0;transform:translateY(15px)}
+  to{opacity:1;transform:none}
+}
+
+@keyframes logoFloat{
+  0%,100%{transform:translateY(0) rotate(0)}
+  50%{transform:translateY(-7px) rotate(1deg)}
+}
+
+@keyframes floatShape{
+  from{transform:translate(0,0) scale(1)}
+  to{transform:translate(70px,-35px) scale(1.12)}
+}
+
+@keyframes rotateShape{
+  to{transform:rotate(360deg)}
+}
+
+@keyframes gradientMove{
+  0%{background-position:0 0}
+  100%{background-position:200% 0}
+}
+
+@keyframes pulseStatus{
+  0%,100%{box-shadow:0 0 0 0 currentColor}
+  50%{box-shadow:0 0 0 5px transparent}
+}
+
+@keyframes toastEnter{
+  from{opacity:0;transform:translateY(15px) scale(.95)}
+  to{opacity:1;transform:none}
+}
+
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-4px)}
+  75%{transform:translateX(4px)}
+}
+
+@media(max-width:850px){
+  header{
+    align-items:flex-start;
+    flex-direction:column;
+    padding:15px 20px;
+  }
+
+  .header-left{
+    width:100%;
+    justify-content:space-between;
+  }
+
+  .stats{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .person{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:600px){
+  .login-box{
+    padding:27px 18px;
+  }
+
+  .logo{
+    width:125px;
+    height:125px;
+  }
+
+  .brand img{
+    width:59px;
+    height:59px;
+  }
+
+  .brand h2{
+    font-size:18px;
+  }
+
+  main{
+    margin:22px auto;
+    padding:0 12px;
+  }
+
+  .stats{
+    gap:10px;
+  }
+
+  .stat{
+    min-height:108px;
+    padding:16px 12px;
+  }
+
+  .stat strong{
+    font-size:25px;
+  }
+
+  .card{
+    padding:17px;
+    border-radius:17px;
+  }
+
+  .form-grid,
+  .info-grid,
+  .search-row{
+    grid-template-columns:1fr;
+  }
+
+  .actions button{
+    width:100%;
+  }
+
+  .field-row{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .field-actions button{
+    flex:1;
+  }
+
+  #toast{
+    right:14px;
+    bottom:14px;
+    max-width:calc(100% - 28px);
+  }
+}
+</style>
+</head>
+
+<body>
+
+<section id="loginPage" class="login-page">
+<div class="login-box">
+<img src="logo.png" class="logo" alt="شعار وزارة الداخلية">
+<h1>نظام أمن البوابات</h1>
+<p id="loginDescription">اختر نوع الدخول وأدخل رمز الدخول</p>
+
+<div class="login-tabs">
+<button id="securityTab" onclick="selectLoginType('security')">دخول الأمن</button>
+<button id="permitsTab" class="gray" onclick="selectLoginType('permits')">دخول التصاريح</button>
+<button id="adminTab" class="gray" onclick="selectLoginType('admin')">دخول الإدارة</button>
+</div>
+
+<form id="loginForm">
+<label>رمز الدخول</label>
+<input id="accessCode" type="password" placeholder="أدخل رمز الدخول" required>
+<button style="width:100%;margin-top:16px">دخول النظام</button>
+<div id="loginError" class="error"></div>
+</form>
+</div>
+</section>
+
+<section id="securityPage" class="hidden">
+<header>
+<div class="brand"><img src="logo.png"><div><h2>نظام أمن البوابات</h2><small>تسجيل دخول وخروج العمال</small></div></div>
+<div class="header-left"><span id="securityUserName">مسؤول الأمن</span><button class="logout" onclick="logout()">تسجيل الخروج</button></div>
+</header>
+
+<main>
+<section class="stats">
+<div class="stat"><span>إجمالي الأشخاص</span><strong id="totalPeople">0</strong></div>
+<div class="stat"><span>التصاريح الفعالة</span><strong id="activePermits">0</strong></div>
+<div class="stat"><span>الموجودون داخل المبنى</span><strong id="insideCount">0</strong></div>
+<div class="stat"><span>عمليات اليوم</span><strong id="todayLogs">0</strong></div>
+</section>
+
+<section class="card">
+<h2>التحقق من تصريح الدخول</h2>
+<div class="search-row"><input id="civilId" placeholder="أدخل الرقم المدني"><button onclick="searchPerson()">بحث</button></div>
+<div class="hint">الرقم المدني التجريبي: <b>123456789012</b></div>
+</section>
+
+<section id="personResult" class="card person hidden"></section>
+
+<section class="card">
+<h2>عمليات اليوم</h2>
+<div class="actions">
+<button class="green" onclick="sendTodayToWhatsApp()">إرسال عمليات اليوم واتساب</button>
+<button class="green" onclick="exportTodayLogs()">تصدير عمليات اليوم Excel</button>
+<button class="orange" onclick="exportAllLogs()">تصدير جميع السجلات Excel</button>
+</div>
+<div id="logsContainer"></div>
+</section>
+</main>
+</section>
+
+<section id="permitsPage" class="hidden">
+<header>
+<div class="brand"><img src="logo.png"><div><h2>صفحة التصاريح</h2><small>إدارة التصاريح والحقول والصور</small></div></div>
+<div class="header-left"><span>مسؤول التصاريح</span><button class="logout" onclick="permitsLogout()">تسجيل الخروج</button></div>
+</header>
+
+<main>
+<section class="card">
+<h2>إضافة تصريح جديد</h2>
+<form id="permitForm"><div id="permitFields" class="form-grid"></div><div class="actions"><button class="green">حفظ التصريح</button></div></form>
+</section>
+
+<section class="card">
+<h2>إضافة حقل جديد</h2>
+<div class="search-row"><input id="newFieldName" placeholder="مثال: القسم أو رقم المركبة"><button onclick="addCustomField()">إضافة حقل</button></div>
+</section>
+
+<section class="card">
+<h2>إلغاء أو إعادة تفعيل الحقول</h2>
+<div id="allFieldsList" class="field-list"></div>
+</section>
+
+<section class="card">
+<h2>إلغاء تصريح</h2>
+<div class="search-row"><input id="cancelCivilId" placeholder="أدخل الرقم المدني"><button class="red" onclick="cancelPermit()">إلغاء التصريح</button></div>
+</section>
+
+<section class="card">
+<h2>البحث عن تصريح للتعديل</h2>
+<div class="search-row"><input id="permitSearchCivilId" placeholder="أدخل الرقم المدني للتعديل" onkeydown="if(event.key==='Enter')searchPermitForEdit()"><button onclick="searchPermitForEdit()">بحث</button></div>
+<div class="hint">ابحث بالرقم المدني للوصول إلى تصريح معين وتعديل جميع بياناته.</div>
+<div id="permitSearchResult"></div>
+</section>
+
+<section class="card">
+<h2>التصاريح الحالية</h2>
+<div id="permitsList"></div>
+</section>
+</main>
+</section>
+
+<section id="adminPage" class="hidden">
+<header>
+<div class="brand"><img src="logo.png"><div><h2>الصفحة الإدارية</h2><small>إحصائيات الدخول ومتابعة مستخدمي النظام</small></div></div>
+<div class="header-left"><span>مسؤول الإدارة</span><button class="logout" onclick="adminLogout()">تسجيل الخروج</button></div>
+</header>
+
+<main>
+<section class="stats">
+<div class="stat"><span>إجمالي عمليات الدخول</span><strong id="adminTotalEntries">0</strong></div>
+<div class="stat"><span>إجمالي عمليات الخروج</span><strong id="adminTotalExits">0</strong></div>
+<div class="stat"><span>المحاولات المرفوضة</span><strong id="adminTotalRejected">0</strong></div>
+<div class="stat"><span>عمليات دخول اليوم</span><strong id="adminTodayEntries">0</strong></div>
+</section>
+
+<section class="card">
+  <h2>الموجودون داخل المبنى</h2>
+
+  <button class="green" onclick="showInsidePeople()">
+    عرض الموجودين داخل المبنى
+  </button>
+
+  <div id="insidePeopleTable" style="margin-top:18px"></div>
+</section>
+
+<section class="card"><h2>إحصائيات مستخدمي الأمن</h2><div id="securityUsersStats"></div></section>
+<section class="card">
+<h2>تفاصيل عمليات الدخول والخروج</h2>
+<div class="search-row">
+  <input
+    id="adminLogSearch"
+    placeholder="ابحث بالرقم المدني أو الاسم أو المستخدم"
+    oninput="renderAdminLogs()"
+  >
+
+  <button class="orange" onclick="exportSecurityLogs()">
+    تصدير Excel
+  </button>
+
+  <button class="red" onclick="clearAllReports()">
+    مسح كل التقارير
+  </button>
+</div>
+
+<div id="adminLogsTable"></div>
+</section>
+</main>
+</section>
+
+<div id="toast"></div>
+
+<script>
+const SECURITY_USERS=[
+{username:"علي",code:"1234"},
+{username:"عزيز",code:"5678"}
+];
+
+const PERMITS_CODE="permit123";
+const ADMIN_CODE="admin123";
+
+const BASE_FIELDS=[
+{key:"civilId",label:"الرقم المدني",type:"text",required:true,system:true},
+{key:"name",label:"الاسم الكامل",type:"text",required:true,system:true},
+{key:"company",label:"الشركة / الجهة",type:"text",required:false,system:true},
+{key:"job",label:"المسمى الوظيفي",type:"text",required:false,system:true},
+{key:"phone",label:"رقم الهاتف",type:"tel",required:false,system:true},
+{key:"permitStart",label:"بداية التصريح",type:"date",required:false,system:true},
+{key:"permitEnd",label:"نهاية التصريح",type:"date",required:false,system:true},
+{key:"allowedArea",label:"المناطق المسموح بها",type:"text",required:false,system:true},
+{key:"photo",label:"صورة الشخص",type:"file",required:false,system:true},
+{key:"cardImage",label:"صورة البطاقة المدنية",type:"file",required:false,system:true},
+{key:"notes",label:"الملاحظات",type:"textarea",required:false,system:true}
+];
+
+const demoPeople=[{
+civilId:"123456789012",name:"أحمد محمد علي",
+company:"شركة الخليج للمقاولات",job:"فني صيانة",phone:"50000000",
+permitStart:"2026-01-01",permitEnd:"2026-12-31",
+allowedArea:"المبنى الرئيسي - البوابة 2",photo:"",cardImage:"",notes:""
+}];
+
+let people=JSON.parse(localStorage.getItem("gatePeople"))||demoPeople;
+let logs=JSON.parse(localStorage.getItem("gateLogs"))||[];
+let customFields=JSON.parse(localStorage.getItem("gateCustomFields"))||[];
+let disabledFields=JSON.parse(localStorage.getItem("gateDisabledFields"))||[];
+let currentPerson=null,currentSecurityUser=null,editingCivilId=null,loginType="security";
+
+function $(id){return document.getElementById(id)}
+function localDateKey(d=new Date()){return d.toISOString().slice(0,10)}
+function nowData(){let d=new Date();return{date:localDateKey(d),iso:d.toISOString(),time:d.toLocaleTimeString("ar-KW")}}
+function savePeople(){
+  localStorage.setItem("gatePeople",JSON.stringify(people));
+}
+
+function saveLogs(){
+  localStorage.setItem("gateLogs",JSON.stringify(logs));
+}
+
+function clearAllReports(){
+  if(!logs.length){
+    toast("لا توجد تقارير لمسحها",false);
+    return;
+  }
+
+  const confirmed=confirm(
+    "تحذير!\n\n"+
+    "هل أنت متأكد من مسح جميع التقارير؟\n"+
+    "سيتم حذف عمليات الدخول والخروج ومحاولات الرفض.\n\n"+
+    "لا يمكن التراجع عن هذه العملية."
+  );
+
+  if(!confirmed)return;
+
+  logs=[];
+
+  localStorage.removeItem("gateLogs");
+
+  if(!$("adminPage").classList.contains("hidden")){
+    renderAdminPage();
+  }
+
+  if(!$("securityPage").classList.contains("hidden")){
+    refreshSecurity();
+  }
+
+  toast("تم مسح جميع التقارير بنجاح");
+}
+
+function saveFields(){
+  localStorage.setItem(
+    "gateCustomFields",
+    JSON.stringify(customFields)
+  );
+
+  localStorage.setItem(
+    "gateDisabledFields",
+    JSON.stringify(disabledFields)
+  );
+}
+
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function formatDate(v){if(!v)return"-";let p=String(v).split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v}
+function allFields(){return[...BASE_FIELDS,...customFields]}
+function activeFields(){return allFields().filter(f=>!disabledFields.includes(f.key))}
+function toast(m,ok=true){$("toast").textContent=m;$("toast").style.background=ok?"#087b42":"#b52323";$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3000)}
+function selectLoginType(t){
+loginType=t;
+$("securityTab").classList.toggle("gray",t!=="security");
+$("permitsTab").classList.toggle("gray",t!=="permits");
+$("adminTab").classList.toggle("gray",t!=="admin");
+$("loginDescription").textContent=t==="security"?"أدخل رمز دخول مستخدم الأمن":t==="permits"?"أدخل رمز الدخول إلى صفحة التصاريح":"أدخل رمز الدخول إلى الصفحة الإدارية";
+$("accessCode").value="";$("loginError").textContent=""
+}
+function findUser(c){return SECURITY_USERS.find(u=>u.code===c)}
+$("loginForm").addEventListener("submit",e=>{
+e.preventDefault();let c=$("accessCode").value.trim();
+if(loginType==="security"){
+let u=findUser(c);if(!u){$("loginError").textContent="رمز دخول الأمن غير صحيح";return}
+currentSecurityUser=u;sessionStorage.setItem("gateSecurityUser",JSON.stringify(u));
+$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");
+$("securityUserName").textContent="مستخدم الأمن: "+u.username;refreshSecurity();return
+}
+if(loginType==="permits"){
+if(c!==PERMITS_CODE){$("loginError").textContent="رمز دخول التصاريح غير صحيح";return}
+sessionStorage.setItem("gatePermitsLoggedIn","true");$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return
+}
+if(c!==ADMIN_CODE){$("loginError").textContent="رمز دخول الإدارة غير صحيح";return}
+sessionStorage.setItem("gateAdminLoggedIn","true");$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()
+});
+function logout(){sessionStorage.removeItem("gateSecurityUser");currentSecurityUser=null;$("securityPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("security")}
+function permitsLogout(){sessionStorage.removeItem("gatePermitsLoggedIn");$("permitsPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("permits")}
+function adminLogout(){sessionStorage.removeItem("gateAdminLoggedIn");$("adminPage").classList.add("hidden");$("loginPage").classList.remove("hidden");selectLoginType("admin")}
+function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
+function searchPerson(){let c=$("civilId").value.trim(),p=people.find(x=>x.civilId===c);if(!c){toast("أدخل الرقم المدني أولًا",false);return}if(!p){currentPerson=null;$("personResult").classList.remove("hidden");$("personResult").innerHTML=`<div><h2>لا يوجد تصريح</h2><p>لم يتم العثور على الرقم المدني: <b>${esc(c)}</b></p><button class="red" onclick="unknownReject('${esc(c)}')">تسجيل محاولة مرفوضة</button></div>`;return}currentPerson=p;renderPerson(p)}
+function renderPerson(p){
+let s=status(p),open=logs.find(l=>l.date===localDateKey()&&l.civilId===p.civilId&&l.type==="دخول"&&!l.exitTime);
+let info=activeFields().filter(f=>!["photo","cardImage","notes"].includes(f.key)).map(f=>`<div class="info-item"><b>${esc(f.label)}</b><span>${esc(["permitStart","permitEnd"].includes(f.key)?formatDate(p[f.key]):p[f.key]||"-")}</span></div>`).join("");
+$("personResult").classList.remove("hidden");
+$("personResult").innerHTML=`<div><img class="person-photo" src="${p.photo||placeholder(p.name)}"></div><div><h2>${esc(p.name)}</h2><span class="status ${s.css}">${s.text}</span><div class="info-grid" style="margin-top:15px">${info}<div class="info-item"><b>حالة التواجد</b><span>${open?"موجود داخل المبنى":"خارج المبنى"}</span></div></div>${activeFields().some(f=>f.key==="cardImage")?`<div class="document"><b>صورة البطاقة المدنية</b><img class="document-image" src="${p.cardImage||cardPlaceholder()}"></div>`:""}${p.notes?`<div class="document"><b>الملاحظات</b><p>${esc(p.notes)}</p></div>`:""}<div class="actions"><button class="green" ${!s.allowed||open?"disabled":""} onclick="entry()">تسجيل دخول</button><button class="orange" ${open?"":"disabled"} onclick="exit()">تسجيل خروج</button><button class="red" onclick="reject()">رفض الدخول</button></div></div>`
+}
+function addLog(x){let n=nowData();logs.unshift({id:Date.now(),date:n.date,time:n.iso,timeText:n.time,securityUser:currentSecurityUser?.username||"غير محدد",...x});saveLogs()}
+function entry(){if(!currentPerson||!status(currentPerson).allowed)return toast("لا يمكن الدخول، التصريح غير فعال",false);if(logs.some(l=>l.date===localDateKey()&&l.civilId===currentPerson.civilId&&l.type==="دخول"&&!l.exitTime))return toast("الشخص مسجل كداخل المبنى",false);addLog({civilId:currentPerson.civilId,name:currentPerson.name,type:"دخول",status:"مقبول",exitTime:"",exitTimeText:"",reason:""});refreshSecurity();toast("تم تسجيل الدخول بنجاح")}
+function exit(){let l=logs.find(x=>x.date===localDateKey()&&x.civilId===currentPerson.civilId&&x.type==="دخول"&&!x.exitTime);if(!l)return toast("لا يوجد دخول مفتوح",false);let n=nowData();l.exitTime=n.iso;l.exitTimeText=n.time;l.exitSecurityUser=currentSecurityUser?.username||"غير محدد";saveLogs();refreshSecurity();toast("تم تسجيل الخروج بنجاح")}
+function reject(){let r=prompt("اكتب سبب رفض الدخول:","التصريح غير مستوفٍ");if(r===null)return;addLog({civilId:currentPerson.civilId,name:currentPerson.name,type:"محاولة دخول",status:"مرفوض",exitTime:"",exitTimeText:"",reason:r||"غير محدد"});refreshSecurity();toast("تم تسجيل رفض الدخول")}
+function unknownReject(c){addLog({civilId:c,name:"غير مسجل",type:"محاولة دخول",status:"مرفوض",exitTime:"",exitTimeText:"",reason:"لا يوجد تصريح بهذا الرقم المدني"});refreshSecurity();toast("تم تسجيل المحاولة المرفوضة")}
+function refreshSecurity(){updateSecurity();renderLogs();if(currentPerson)renderPerson(currentPerson)}
+function updateSecurity(){$("totalPeople").textContent=people.length;$("activePermits").textContent=people.filter(p=>status(p).allowed).length;$("insideCount").textContent=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول"&&!l.exitTime).length;$("todayLogs").textContent=logs.filter(l=>l.date===localDateKey()).length}
+function renderLogs(){let a=logs.filter(l=>l.date===localDateKey());$("logsContainer").innerHTML=!a.length?`<div class="empty">لا توجد عمليات اليوم</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>العملية</th><th>الحالة</th><th>المستخدم</th><th>الوقت</th><th>الخروج</th><th>السبب</th></tr>${a.map(l=>`<tr><td>${esc(l.name)}</td><td>${esc(l.civilId)}</td><td>${esc(l.type)}</td><td>${esc(l.status)}</td><td>${esc(l.securityUser)}</td><td>${esc(l.timeText)}</td><td>${esc(l.exitTimeText||"-")}</td><td>${esc(l.reason||"-")}</td></tr>`).join("")}</table></div>`}
+function makeInput(f,prefix,value=""){let id=prefix+f.key;if(f.type==="file")return`<div><label>${esc(f.label)}</label><input id="${id}" type="file" accept="image/*"></div>`;if(f.type==="textarea")return`<div><label>${esc(f.label)}</label><textarea id="${id}">${esc(value)}</textarea></div>`;return`<div><label>${esc(f.label)}</label><input id="${id}" type="${f.type}" value="${esc(value)}" ${f.required?"required":""}></div>`}
+function renderPermitFields(){$("permitFields").innerHTML=activeFields().map(f=>makeInput(f,"new_")).join("")}
+function fileData(f){return new Promise((res,rej)=>{if(!f)return res("");let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
+$("permitForm").addEventListener("submit",async e=>{e.preventDefault();let p={};for(let f of allFields()){let i=$("new_"+f.key);p[f.key]=f.type==="file"?await fileData(i?.files[0]):i?.value.trim()||""}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x.civilId===p.civilId))return toast("يوجد تصريح بهذا الرقم المدني",false);people.push(p);savePeople();e.target.reset();renderPermitsPage();toast("تم حفظ التصريح بنجاح")})
+function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
+function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
+function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
+function cancelPermit(){let c=$("cancelCivilId").value.trim(),i=people.findIndex(p=>p.civilId===c);if(i<0)return toast("لم يتم العثور على التصريح",false);if(!confirm("هل تريد إلغاء هذا التصريح؟"))return;people.splice(i,1);savePeople();$("cancelCivilId").value="";renderPermitsPage();toast("تم إلغاء التصريح")}
+function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
+function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
+function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
+async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});saveLogs();savePeople();editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
+function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
+function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
+function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople()}
+
+
+function showInsidePeople(){
+  const inside=logs.filter(l=>
+    l.date===localDateKey() &&
+    l.type==="دخول" &&
+    !l.exitTime
+  );
+
+  if(!inside.length){
+    $("insidePeopleTable").innerHTML=
+      `<div class="empty">لا يوجد أشخاص داخل المبنى حاليًا</div>`;
+    return;
+  }
+
+  $("insidePeopleTable").innerHTML=`
+    <div class="table-wrapper">
+      <table>
+        <tr>
+          <th>الاسم</th>
+          <th>الرقم المدني</th>
+          <th>وقت الدخول</th>
+          <th>مستخدم الدخول</th>
+          <th>الحالة</th>
+        </tr>
+
+        ${inside.map(l=>`
+          <tr>
+            <td>${esc(l.name||"-")}</td>
+            <td>${esc(l.civilId||"-")}</td>
+            <td>${esc(l.timeText||"-")}</td>
+            <td>${esc(l.securityUser||"-")}</td>
+            <td>
+              <span class="status active">
+                موجود داخل المبنى
+              </span>
+            </td>
+          </tr>
+        `).join("")}
+      </table>
+    </div>
+  `;
+}
+
+function renderAdminLogs(){
+  let q=$("adminLogSearch").value.toLowerCase().trim();
+
+  let a=logs.filter(l=>{
+    let text=[
+      l.name,
+      l.civilId,
+      l.securityUser,
+      l.exitSecurityUser,
+      l.type,
+      l.status
+    ].join(" ").toLowerCase();
+
+    return !q || text.includes(q);
+  });
+
+  if(!a.length){
+    $("adminLogsTable").innerHTML=
+      `<div class="empty">لا توجد سجلات</div>`;
+    return;
+  }
+
+  $("adminLogsTable").innerHTML=`
+    <div class="table-wrapper">
+      <table>
+        <tr>
+          <th>التاريخ</th>
+          <th>الاسم</th>
+          <th>الرقم المدني</th>
+          <th>العملية</th>
+          <th>الحالة</th>
+          <th>وقت الدخول</th>
+          <th>مستخدم الدخول</th>
+          <th>وقت الخروج</th>
+          <th>مستخدم الخروج</th>
+          <th>السبب</th>
+        </tr>
+
+        ${a.map(l=>`
+          <tr>
+            <td>${formatDate(l.date)}</td>
+            <td>${esc(l.name)}</td>
+            <td>${esc(l.civilId)}</td>
+            <td>${esc(l.type)}</td>
+            <td>${esc(l.status)}</td>
+            <td>${l.type==="دخول"?esc(l.timeText||"-"):"-"}</td>
+            <td>${l.type==="دخول"?esc(l.securityUser||"-"):"-"}</td>
+            <td>${esc(l.exitTimeText||"لم يسجل خروج")}</td>
+            <td>${esc(l.exitSecurityUser||"-")}</td>
+            <td>${esc(l.reason||"-")}</td>
+          </tr>
+        `).join("")}
+      </table>
+    </div>
+  `;
+}
+
+function placeholder(){return"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="100%" height="100%" fill="#e9eff4"/><text x="50%" y="50%" text-anchor="middle" fill="#0b3d6b">لا توجد صورة</text></svg>`)}
+function cardPlaceholder(){return placeholder()}
+function exportLogs(data,name){
+  let rows=data.map(l=>({
+    "التاريخ":l.date||"",
+    "اسم العامل":l.name||"",
+    "الرقم المدني":l.civilId||"",
+    "العملية":l.type||"",
+    "الحالة":l.status||"",
+    "وقت الدخول":l.timeText||"",
+    "مستخدم تسجيل الدخول":l.securityUser||"غير محدد",
+    "وقت الخروج":l.exitTimeText||"لم يسجل خروج",
+    "مستخدم تسجيل الخروج":l.exitSecurityUser||"لم يسجل خروج",
+    "السبب":l.reason||""
+  }));
+
+  let w=XLSX.utils.book_new();
+  let s=XLSX.utils.json_to_sheet(rows);
+
+  s["!cols"]=[
+    {wch:14},
+    {wch:24},
+    {wch:18},
+    {wch:18},
+    {wch:14},
+    {wch:16},
+    {wch:24},
+    {wch:16},
+    {wch:24},
+    {wch:35}
+  ];
+
+  XLSX.utils.book_append_sheet(w,s,"السجلات");
+  XLSX.writeFile(w,name+".xlsx");
+}
+function exportTodayLogs(){let a=logs.filter(l=>l.date===localDateKey());if(a.length)exportLogs(a,"سجل_اليوم");else toast("لا توجد سجلات لليوم",false)}
+function exportAllLogs(){if(logs.length)exportLogs(logs,"جميع_السجلات");else toast("لا توجد سجلات",false)}
+function exportSecurityLogs(){exportLogs(logs,"سجل_الدخول_والخروج")}
+function sendTodayToWhatsApp(){
+  let a=logs.filter(l=>l.date===localDateKey());
+
+  if(!a.length){
+    return toast("لا توجد عمليات اليوم",false);
+  }
+
+  let m=a.map(l=>{
+    let entryTime=l.timeText||"-";
+    let exitTime=l.exitTimeText||"لم يسجل خروج";
+    let entryUser=l.securityUser||"غير محدد";
+    let exitUser=l.exitSecurityUser||"لم يسجل خروج";
+
+    return [
+      `اسم العامل: ${l.name||"-"}`,
+      `الرقم المدني: ${l.civilId||"-"}`,
+      `العملية: ${l.type||"-"}`,
+      `الحالة: ${l.status||"-"}`,
+      `وقت الدخول: ${entryTime}`,
+      `مستخدم تسجيل الدخول: ${entryUser}`,
+      `وقت الخروج: ${exitTime}`,
+      `مستخدم تسجيل الخروج: ${exitUser}`,
+      `السبب: ${l.reason||"-"}`
+    ].join("\n");
+  }).join("\n\n--------------------\n\n");
+
+  let message=
+`تقرير عمليات اليوم
+التاريخ: ${formatDate(localDateKey())}
+
+${m}`;
+
+  window.open(
+    "https://wa.me/?text="+encodeURIComponent(message),
+    "_blank"
+  );
+}
+
+function initialize(){let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
+initialize();
+</script>
+</body>
+</html>
