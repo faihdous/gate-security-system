@@ -502,26 +502,11 @@ main{
 }
 
 .person{
-  display:grid;
-  grid-template-columns:220px 1fr;
-  gap:30px;
+  display:block;
 }
 
-.person-photo{
-  width:195px;
-  height:225px;
-  object-fit:cover;
-  border:5px solid #fff;
-  border-radius:19px;
-  background:#eaf0f4;
-  box-shadow:0 13px 28px rgba(8,61,107,.22);
-  transition:transform .35s ease,box-shadow .35s ease;
-}
 
-.person-photo:hover{
-  transform:scale(1.035) rotate(-1deg);
-  box-shadow:0 18px 35px rgba(8,61,107,.28);
-}
+
 
 .info-item{
   padding:14px;
@@ -1051,7 +1036,6 @@ const BASE_FIELDS=[
 {key:"permitStart",label:"بداية التصريح",type:"date",required:false,system:true},
 {key:"permitEnd",label:"نهاية التصريح",type:"date",required:false,system:true},
 {key:"allowedArea",label:"المناطق المسموح بها",type:"text",required:false,system:true},
-{key:"photo",label:"صورة الشخص",type:"file",required:false,system:true},
 {key:"cardImage",label:"صورة البطاقة المدنية",type:"file",required:false,system:true},
 {key:"notes",label:"الملاحظات",type:"textarea",required:false,system:true}
 ];
@@ -1060,10 +1044,16 @@ const demoPeople=[{
 civilId:"123456789012",name:"أحمد محمد علي",
 company:"شركة الخليج للمقاولات",job:"فني صيانة",phone:"50000000",
 permitStart:"2026-01-01",permitEnd:"2026-12-31",
-allowedArea:"المبنى الرئيسي - البوابة 2",photo:"",cardImage:"",notes:""
+allowedArea:"المبنى الرئيسي - البوابة 2",cardImage:"",notes:""
 }];
 
 let people=JSON.parse(localStorage.getItem("gatePeople"))||demoPeople;
+  people.forEach(p=>{
+  delete p.photo;
+});
+
+localStorage.setItem("gatePeople",JSON.stringify(people));
+
 let logs=JSON.parse(localStorage.getItem("gateLogs"))||[];
 let customFields=JSON.parse(localStorage.getItem("gateCustomFields"))||[];
 let disabledFields=JSON.parse(localStorage.getItem("gateDisabledFields"))||[];
@@ -1157,11 +1147,93 @@ function adminLogout(){sessionStorage.removeItem("gateAdminLoggedIn");$("adminPa
 function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
 function searchPerson(){let c=$("civilId").value.trim(),p=people.find(x=>x.civilId===c);if(!c){toast("أدخل الرقم المدني أولًا",false);return}if(!p){currentPerson=null;$("personResult").classList.remove("hidden");$("personResult").innerHTML=`<div><h2>لا يوجد تصريح</h2><p>لم يتم العثور على الرقم المدني: <b>${esc(c)}</b></p><button class="red" onclick="unknownReject('${esc(c)}')">تسجيل محاولة مرفوضة</button></div>`;return}currentPerson=p;renderPerson(p)}
 function renderPerson(p){
-let s=status(p),open=logs.find(l=>l.date===localDateKey()&&l.civilId===p.civilId&&l.type==="دخول"&&!l.exitTime);
-let info=activeFields().filter(f=>!["photo","cardImage","notes"].includes(f.key)).map(f=>`<div class="info-item"><b>${esc(f.label)}</b><span>${esc(["permitStart","permitEnd"].includes(f.key)?formatDate(p[f.key]):p[f.key]||"-")}</span></div>`).join("");
-$("personResult").classList.remove("hidden");
-$("personResult").innerHTML=`<div><img class="person-photo" src="${p.photo||placeholder(p.name)}"></div><div><h2>${esc(p.name)}</h2><span class="status ${s.css}">${s.text}</span><div class="info-grid" style="margin-top:15px">${info}<div class="info-item"><b>حالة التواجد</b><span>${open?"موجود داخل المبنى":"خارج المبنى"}</span></div></div>${activeFields().some(f=>f.key==="cardImage")?`<div class="document"><b>صورة البطاقة المدنية</b><img class="document-image" src="${p.cardImage||cardPlaceholder()}"></div>`:""}${p.notes?`<div class="document"><b>الملاحظات</b><p>${esc(p.notes)}</p></div>`:""}<div class="actions"><button class="green" ${!s.allowed||open?"disabled":""} onclick="entry()">تسجيل دخول</button><button class="orange" ${open?"":"disabled"} onclick="exit()">تسجيل خروج</button><button class="red" onclick="reject()">رفض الدخول</button></div></div>`
+  let s=status(p);
+
+  let open=logs.find(l=>
+    l.date===localDateKey() &&
+    l.civilId===p.civilId &&
+    l.type==="دخول" &&
+    !l.exitTime
+  );
+
+  let info=activeFields()
+    .filter(f=>!["cardImage","notes"].includes(f.key))
+    .map(f=>`
+      <div class="info-item">
+        <b>${esc(f.label)}</b>
+        <span>
+          ${esc(
+            ["permitStart","permitEnd"].includes(f.key)
+              ? formatDate(p[f.key])
+              : p[f.key]||"-"
+          )}
+        </span>
+      </div>
+    `)
+    .join("");
+
+  $("personResult").classList.remove("hidden");
+
+  $("personResult").innerHTML=`
+    <div>
+      <h2>${esc(p.name)}</h2>
+
+      <span class="status ${s.css}">
+        ${s.text}
+      </span>
+
+      <div class="info-grid" style="margin-top:15px">
+        ${info}
+
+        <div class="info-item">
+          <b>حالة التواجد</b>
+          <span>${open?"موجود داخل المبنى":"خارج المبنى"}</span>
+        </div>
+      </div>
+
+      ${
+        activeFields().some(f=>f.key==="cardImage")
+        ? `
+          <div class="document">
+            <b>صورة البطاقة المدنية</b>
+            <img
+              class="document-image"
+              src="${p.cardImage||cardPlaceholder()}"
+              alt="صورة البطاقة المدنية"
+            >
+          </div>
+        `
+        : ""
+      }
+
+      ${
+        p.notes
+        ? `
+          <div class="document">
+            <b>الملاحظات</b>
+            <p>${esc(p.notes)}</p>
+          </div>
+        `
+        : ""
+      }
+
+      <div class="actions">
+        <button class="green" ${!s.allowed||open?"disabled":""} onclick="entry()">
+          تسجيل دخول
+        </button>
+
+        <button class="orange" ${open?"":"disabled"} onclick="exit()">
+          تسجيل خروج
+        </button>
+
+        <button class="red" onclick="reject()">
+          رفض الدخول
+        </button>
+            </div>
+    </div>
+  `;
 }
+
 function addLog(x){let n=nowData();logs.unshift({id:Date.now(),date:n.date,time:n.iso,timeText:n.time,securityUser:currentSecurityUser?.username||"غير محدد",...x});saveLogs()}
 function entry(){if(!currentPerson||!status(currentPerson).allowed)return toast("لا يمكن الدخول، التصريح غير فعال",false);if(logs.some(l=>l.date===localDateKey()&&l.civilId===currentPerson.civilId&&l.type==="دخول"&&!l.exitTime))return toast("الشخص مسجل كداخل المبنى",false);addLog({civilId:currentPerson.civilId,name:currentPerson.name,type:"دخول",status:"مقبول",exitTime:"",exitTimeText:"",reason:""});refreshSecurity();toast("تم تسجيل الدخول بنجاح")}
 function exit(){let l=logs.find(x=>x.date===localDateKey()&&x.civilId===currentPerson.civilId&&x.type==="دخول"&&!x.exitTime);if(!l)return toast("لا يوجد دخول مفتوح",false);let n=nowData();l.exitTime=n.iso;l.exitTimeText=n.time;l.exitSecurityUser=currentSecurityUser?.username||"غير محدد";saveLogs();refreshSecurity();toast("تم تسجيل الخروج بنجاح")}
@@ -1286,8 +1358,22 @@ function renderAdminLogs(){
   `;
 }
 
-function placeholder(){return"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="100%" height="100%" fill="#e9eff4"/><text x="50%" y="50%" text-anchor="middle" fill="#0b3d6b">لا توجد صورة</text></svg>`)}
-function cardPlaceholder(){return placeholder()}
+
+function cardPlaceholder(){
+  return "data:image/svg+xml;charset=UTF-8,"+
+    encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="600" height="380">
+        <rect width="100%" height="100%" fill="#e9eff4"/>
+        <text x="50%" y="50%"
+              text-anchor="middle"
+              fill="#0b3d6b"
+              font-size="24">
+          لا توجد صورة للبطاقة المدنية
+        </text>
+      </svg>
+    `);
+}
+
 function exportLogs(data,name){
   let rows=data.map(l=>({
     "التاريخ":l.date||"",
