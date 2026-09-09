@@ -1077,28 +1077,115 @@ permitStart:"2026-01-01",permitEnd:"2026-12-31",
 allowedArea:"المبنى الرئيسي - البوابة 2",cardImage:"",notes:""
 }];
 
-let people=JSON.parse(localStorage.getItem("gatePeople"))||demoPeople;
-  people.forEach(p=>{
-  delete p.photo;
-});
+let people = [];
+let logs = [];
 
-localStorage.setItem("gatePeople",JSON.stringify(people));
+let customFields =
+  JSON.parse(localStorage.getItem("gateCustomFields")) || [];
 
-let logs=JSON.parse(localStorage.getItem("gateLogs"))||[];
-let customFields=JSON.parse(localStorage.getItem("gateCustomFields"))||[];
-let disabledFields=JSON.parse(localStorage.getItem("gateDisabledFields"))||[];
+let disabledFields =
+  JSON.parse(localStorage.getItem("gateDisabledFields")) || [];
+
 let currentPerson=null,currentSecurityUser=null,editingCivilId=null,loginType="security";
 
 function $(id){return document.getElementById(id)}
 function localDateKey(d=new Date()){return d.toISOString().slice(0,10)}
 function nowData(){let d=new Date();return{date:localDateKey(d),iso:d.toISOString(),time:d.toLocaleTimeString("ar-KW")}}
-function savePeople(){
-  localStorage.setItem("gatePeople",JSON.stringify(people));
+function permitToDb(p){
+  return {
+    civil_id: p.civilId,
+    full_name: p.name,
+    company: p.company || "",
+    job: p.job || "",
+    phone: p.phone || "",
+    permit_start: p.permitStart || null,
+    permit_end: p.permitEnd || null,
+    allowed_area: p.allowedArea || "",
+    card_image_path: p.cardImage || "",
+    notes: p.notes || "",
+    custom_data: p.customData || {},
+    is_active: true
+  };
 }
 
-function saveLogs(){
-  localStorage.setItem("gateLogs",JSON.stringify(logs));
+function dbToPermit(row){
+  return {
+    id: row.id,
+    civilId: row.civil_id,
+    name: row.full_name,
+    company: row.company || "",
+    job: row.job || "",
+    phone: row.phone || "",
+    permitStart: row.permit_start || "",
+    permitEnd: row.permit_end || "",
+    allowedArea: row.allowed_area || "",
+    cardImage: row.card_image_path || "",
+    notes: row.notes || "",
+    customData: row.custom_data || {}
+  };
 }
+
+function dbToLog(row){
+  return {
+    id: row.id,
+    date: row.created_at
+      ? row.created_at.slice(0,10)
+      : "",
+    time: row.entry_time || row.created_at || "",
+    timeText: row.entry_time
+      ? new Date(row.entry_time).toLocaleTimeString("ar-KW")
+      : "-",
+    civilId: row.civil_id || "",
+    name: row.full_name || "",
+    type: row.type || "",
+    status: row.status || "",
+    securityUser: row.security_user || "",
+    exitSecurityUser: row.exit_security_user || "",
+    exitTime: row.exit_time || "",
+    exitTimeText: row.exit_time
+      ? new Date(row.exit_time).toLocaleTimeString("ar-KW")
+      : "",
+    reason: row.reason || ""
+  };
+}
+async function loadPeopleFromSupabase(){
+  const { data, error } = await supabaseClient
+    .from("permits")
+    .select("*")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if(error){
+    console.error("خطأ تحميل التصاريح:", error);
+    toast("تعذر تحميل التصاريح من Supabase", false);
+    return;
+  }
+
+  people = (data || []).map(dbToPermit);
+}
+
+async function loadLogsFromSupabase(){
+  const { data, error } = await supabaseClient
+    .from("gate_logs")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if(error){
+    console.error("خطأ تحميل السجلات:", error);
+    toast("تعذر تحميل السجلات من Supabase", false);
+    return;
+  }
+
+  logs = (data || []).map(dbToLog);
+}
+
+async function loadAllData(){
+  await Promise.all([
+    loadPeopleFromSupabase(),
+    loadLogsFromSupabase()
+  ]);
+}
+
 
 function clearAllReports(){
   if(!logs.length){
@@ -1115,9 +1202,18 @@ function clearAllReports(){
 
   if(!confirmed)return;
 
-  logs=[];
+  const { error } = await supabaseClient
+  .from("gate_logs")
+  .delete()
+  .neq("id", 0);
 
-  localStorage.removeItem("gateLogs");
+if(error){
+  console.error(error);
+  return toast("تعذر مسح التقارير", false);
+}
+
+logs = [];
+
 
   if(!$("adminPage").classList.contains("hidden")){
     renderAdminPage();
@@ -1384,22 +1480,198 @@ function renderPerson(p){
   `;
 }
 
-function addLog(x){let n=nowData();logs.unshift({id:Date.now(),date:n.date,time:n.iso,timeText:n.time,securityUser:currentSecurityUser?.username||"غير محدد",...x});saveLogs()}
-function entry(){if(!currentPerson||!status(currentPerson).allowed)return toast("لا يمكن الدخول، التصريح غير فعال",false);if(logs.some(l=>l.date===localDateKey()&&l.civilId===currentPerson.civilId&&l.type==="دخول"&&!l.exitTime))return toast("الشخص مسجل كداخل المبنى",false);addLog({civilId:currentPerson.civilId,name:currentPerson.name,type:"دخول",status:"مقبول",exitTime:"",exitTimeText:"",reason:""});refreshSecurity();toast("تم تسجيل الدخول بنجاح")}
-function exit(){let l=logs.find(x=>x.date===localDateKey()&&x.civilId===currentPerson.civilId&&x.type==="دخول"&&!x.exitTime);if(!l)return toast("لا يوجد دخول مفتوح",false);let n=nowData();l.exitTime=n.iso;l.exitTimeText=n.time;l.exitSecurityUser=currentSecurityUser?.username||"غير محدد";saveLogs();refreshSecurity();toast("تم تسجيل الخروج بنجاح")}
-function reject(){let r=prompt("اكتب سبب رفض الدخول:","التصريح غير مستوفٍ");if(r===null)return;addLog({civilId:currentPerson.civilId,name:currentPerson.name,type:"محاولة دخول",status:"مرفوض",exitTime:"",exitTimeText:"",reason:r||"غير محدد"});refreshSecurity();toast("تم تسجيل رفض الدخول")}
-function unknownReject(c){addLog({civilId:c,name:"غير مسجل",type:"محاولة دخول",status:"مرفوض",exitTime:"",exitTimeText:"",reason:"لا يوجد تصريح بهذا الرقم المدني"});refreshSecurity();toast("تم تسجيل المحاولة المرفوضة")}
+async function addLog(x){
+  const user = await supabaseClient.auth.getUser();
+
+  const row = {
+    permit_id: currentPerson?.id || null,
+    civil_id: x.civilId || currentPerson?.civilId || "",
+    full_name: x.name || currentPerson?.name || "",
+    type: x.type || "",
+    status: x.status || "",
+    security_user: user.data.user?.email || "غير محدد",
+    exit_security_user: null,
+    entry_time: new Date().toISOString(),
+    exit_time: null,
+    reason: x.reason || ""
+  };
+
+  const { data, error } = await supabaseClient
+    .from("gate_logs")
+    .insert(row)
+    .select()
+    .single();
+
+  if(error){
+    console.error(error);
+    toast("تعذر حفظ العملية: " + error.message, false);
+    return null;
+  }
+
+  const newLog = dbToLog(data);
+  logs.unshift(newLog);
+  return newLog;
+}
+
+async function entry(){
+  if(!currentPerson || !status(currentPerson).allowed){
+    return toast("لا يمكن الدخول، التصريح غير فعال", false);
+  }
+
+  if(logs.some(l =>
+    l.date === localDateKey() &&
+    l.civilId === currentPerson.civilId &&
+    l.type === "دخول" &&
+    !l.exitTime
+  )){
+    return toast("الشخص مسجل كداخل المبنى", false);
+  }
+
+  const result = await addLog({
+    civilId: currentPerson.civilId,
+    name: currentPerson.name,
+    type: "دخول",
+    status: "مقبول",
+    reason: ""
+  });
+
+  if(result){
+    refreshSecurity();
+    toast("تم تسجيل الدخول بنجاح");
+  }
+}
+
+async function exit(){
+  let l = logs.find(x =>
+    x.date === localDateKey() &&
+    x.civilId === currentPerson.civilId &&
+    x.type === "دخول" &&
+    !x.exitTime
+  );
+
+  if(!l){
+    return toast("لا يوجد دخول مفتوح", false);
+  }
+
+  const user = await supabaseClient.auth.getUser();
+  const exitTime = new Date().toISOString();
+
+  const { error } = await supabaseClient
+    .from("gate_logs")
+    .update({
+      exit_time: exitTime,
+      exit_security_user: user.data.user?.email || "غير محدد"
+    })
+    .eq("id", l.id);
+
+  if(error){
+    console.error(error);
+    return toast("تعذر تسجيل الخروج: " + error.message, false);
+  }
+
+  l.exitTime = exitTime;
+  l.exitTimeText = new Date(exitTime)
+    .toLocaleTimeString("ar-KW");
+
+  l.exitSecurityUser =
+    user.data.user?.email || "غير محدد";
+
+  refreshSecurity();
+  toast("تم تسجيل الخروج بنجاح");
+}
+
+async function reject(){
+  let r = prompt(
+    "اكتب سبب رفض الدخول:",
+    "التصريح غير مستوفٍ"
+  );
+
+  if(r === null) return;
+
+  const result = await addLog({
+    civilId: currentPerson?.civilId || "",
+    name: currentPerson?.name || "غير مسجل",
+    type: "محاولة دخول",
+    status: "مرفوض",
+    reason: r || "غير محدد"
+  });
+
+  if(result){
+    refreshSecurity();
+    toast("تم تسجيل رفض الدخول");
+  }
+}
+
+async function unknownReject(c){
+  const result = await addLog({
+    civilId: c,
+    name: "غير مسجل",
+    type: "محاولة دخول",
+    status: "مرفوض",
+    reason: "لا يوجد تصريح بهذا الرقم المدني"
+  });
+
+  if(result){
+    refreshSecurity();
+    toast("تم تسجيل المحاولة المرفوضة");
+  }
+}
+
 function refreshSecurity(){updateSecurity();renderLogs();if(currentPerson)renderPerson(currentPerson)}
 function updateSecurity(){$("totalPeople").textContent=people.length;$("activePermits").textContent=people.filter(p=>status(p).allowed).length;$("insideCount").textContent=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول"&&!l.exitTime).length;$("todayLogs").textContent=logs.filter(l=>l.date===localDateKey()).length}
 function renderLogs(){let a=logs.filter(l=>l.date===localDateKey());$("logsContainer").innerHTML=!a.length?`<div class="empty">لا توجد عمليات اليوم</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>العملية</th><th>الحالة</th><th>المستخدم</th><th>الوقت</th><th>الخروج</th><th>السبب</th></tr>${a.map(l=>`<tr><td>${esc(l.name)}</td><td>${esc(l.civilId)}</td><td>${esc(l.type)}</td><td>${esc(l.status)}</td><td>${esc(l.securityUser)}</td><td>${esc(l.timeText)}</td><td>${esc(l.exitTimeText||"-")}</td><td>${esc(l.reason||"-")}</td></tr>`).join("")}</table></div>`}
 function makeInput(f,prefix,value=""){let id=prefix+f.key;if(f.type==="file")return`<div><label>${esc(f.label)}</label><input id="${id}" type="file" accept="image/*"></div>`;if(f.type==="textarea")return`<div><label>${esc(f.label)}</label><textarea id="${id}">${esc(value)}</textarea></div>`;return`<div><label>${esc(f.label)}</label><input id="${id}" type="${f.type}" value="${esc(value)}" ${f.required?"required":""}></div>`}
 function renderPermitFields(){$("permitFields").innerHTML=activeFields().map(f=>makeInput(f,"new_")).join("")}
 function fileData(f){return new Promise((res,rej)=>{if(!f)return res("");let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
-$("permitForm").addEventListener("submit",async e=>{e.preventDefault();let p={};for(let f of allFields()){let i=$("new_"+f.key);p[f.key]=f.type==="file"?await fileData(i?.files[0]):i?.value.trim()||""}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x.civilId===p.civilId))return toast("يوجد تصريح بهذا الرقم المدني",false);people.push(p);savePeople();e.target.reset();renderPermitsPage();toast("تم حفظ التصريح بنجاح")})
+$("permitForm").addEventListener("submit",async e=>{e.preventDefault();let p={};for(let f of allFields()){let i=$("new_"+f.key);p[f.key]=f.type==="file"?await fileData(i?.files[0]):i?.value.trim()||""}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x.civilId===p.civilId))return toast("يوجد تصريح بهذا الرقم المدني",false);const { data, error } = await supabaseClient
+  .from("permits")
+  .insert(permitToDb(p))
+  .select()
+  .single();
+
+if(error){
+  console.error(error);
+  return toast("تعذر حفظ التصريح: " + error.message, false);
+}
+
+people.unshift(dbToPermit(data));
+
+e.target.reset();
+renderPermitsPage();
+toast("تم حفظ التصريح بنجاح");
+})
 function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
 function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
 function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
-function cancelPermit(){let c=$("cancelCivilId").value.trim(),i=people.findIndex(p=>p.civilId===c);if(i<0)return toast("لم يتم العثور على التصريح",false);if(!confirm("هل تريد إلغاء هذا التصريح؟"))return;people.splice(i,1);savePeople();$("cancelCivilId").value="";renderPermitsPage();toast("تم إلغاء التصريح")}
+async function cancelPermit(){
+  let c = $("cancelCivilId").value.trim();
+  let p = people.find(x => x.civilId === c);
+
+  if(!p){
+    return toast("لم يتم العثور على التصريح", false);
+  }
+
+  if(!confirm("هل تريد إلغاء هذا التصريح؟")){
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("permits")
+    .update({ is_active: false })
+    .eq("id", p.id);
+
+  if(error){
+    console.error(error);
+    return toast("تعذر إلغاء التصريح", false);
+  }
+
+  people = people.filter(x => x.id !== p.id);
+
+  $("cancelCivilId").value = "";
+  renderPermitsPage();
+  toast("تم إلغاء التصريح");
+}
+
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
 function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
