@@ -1101,11 +1101,9 @@ allowedArea:"المبنى الرئيسي - البوابة 2",cardImage:"",notes:
 let people = [];
 let logs = [];
 
-let customFields =
-  JSON.parse(localStorage.getItem("gateCustomFields")) || [];
+let customFields = [];
+let disabledFields = [];
 
-let disabledFields =
-  JSON.parse(localStorage.getItem("gateDisabledFields")) || [];
 
 let currentPerson=null,currentSecurityUser=null,editingCivilId=null,loginType="security";
 
@@ -1242,22 +1240,18 @@ logs = [];
 
   if(!$("securityPage").classList.contains("hidden")){
     refreshSecurity();
+    await loadAllData();
+refreshSecurity();
+
   }
 
   toast("تم مسح جميع التقارير بنجاح");
 }
 
 function saveFields(){
-  localStorage.setItem(
-    "gateCustomFields",
-    JSON.stringify(customFields)
-  );
-
-  localStorage.setItem(
-    "gateDisabledFields",
-    JSON.stringify(disabledFields)
-  );
+  // تم إيقاف الحفظ في Local Storage
 }
+
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function formatDate(v){if(!v)return"-";let p=String(v).split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v}
@@ -1663,7 +1657,15 @@ toast("تم حفظ التصريح بنجاح");
 })
 function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
 function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
-function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
+function savePeople(){
+  // التصاريح محفوظة في Supabase
+}
+
+function saveLogs(){
+  // السجلات محفوظة في Supabase
+}
+
+  function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
 async function cancelPermit(){
   let c = $("cancelCivilId").value.trim();
   let p = people.find(x => x.civilId === c);
@@ -1892,7 +1894,13 @@ ${m}`;
 }
 
 function initialize(){let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
-initialize();
+async function startApp(){
+  await loadAllData();
+  initialize();
+}
+
+startApp();
+
 </script>
 </body>
 </html>
