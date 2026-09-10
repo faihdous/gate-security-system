@@ -949,7 +949,7 @@ tbody tr:last-child td{
 <section class="card">
 <h2>التحقق من تصريح الدخول</h2>
 <div class="search-row"><input id="civilId" placeholder="أدخل الرقم المدني"><button onclick="searchPerson()">بحث</button></div>
-
+<div class="hint">الرقم المدني التجريبي: <b>123456789012</b></div>
 </section>
 
 <section id="personResult" class="card person hidden"></section>
@@ -1069,7 +1069,14 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_KEY
 );
 
+const SECURITY_USERS=[
 
+{username:"علي",code:"1234"},
+{username:"عزيز",code:"5678"}
+];
+
+const PERMITS_CODE="permit123";
+const ADMIN_CODE="admin123";
 
 const BASE_FIELDS=[
 {key:"civilId",label:"الرقم المدني",type:"text",required:true,system:true},
@@ -1094,14 +1101,23 @@ allowedArea:"المبنى الرئيسي - البوابة 2",cardImage:"",notes:
 let people = [];
 let logs = [];
 
-let customFields = [];
+let customFields =
+  JSON.parse(localStorage.getItem("gateCustomFields")) || [];
 
-
+let disabledFields =
+  JSON.parse(localStorage.getItem("gateDisabledFields")) || [];
 
 let currentPerson=null,currentSecurityUser=null,editingCivilId=null,loginType="security";
 
 function $(id){return document.getElementById(id)}
-function localDateKey(d=new Date()){return d.toISOString().slice(0,10)}
+function localDateKey(d = new Date()){
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function nowData(){let d=new Date();return{date:localDateKey(d),iso:d.toISOString(),time:d.toLocaleTimeString("ar-KW")}}
 function permitToDb(p){
   return {
@@ -1121,9 +1137,7 @@ function permitToDb(p){
 }
 
 function dbToPermit(row){
-  const customData = row.custom_data || {};
-
-  const permit = {
+  return {
     id: row.id,
     civilId: row.civil_id,
     name: row.full_name,
@@ -1135,42 +1149,26 @@ function dbToPermit(row){
     allowedArea: row.allowed_area || "",
     cardImage: row.card_image_path || "",
     notes: row.notes || "",
-    customData: customData
+    customData: row.custom_data || {}
   };
-
-  for(const field of customFields){
-    permit[field.key] = customData[field.key] || "";
-  }
-
-  return permit;
 }
 
 function dbToLog(row){
-  const entryTime = row.entry_time || row.created_at;
-
-  let type = "محاولة دخول";
-
-  if(row.operation_type === "entry"){
-    type = "دخول";
-  }else if(row.operation_type === "exit"){
-    type = "خروج";
-  }else if(row.operation_type === "rejected"){
-    type = "محاولة دخول";
-  }
-
   return {
     id: row.id,
-    date: entryTime ? entryTime.slice(0,10) : "",
-    time: entryTime || "",
-    timeText: entryTime
-      ? new Date(entryTime).toLocaleTimeString("ar-KW")
+    date: row.created_at
+      ? row.created_at.slice(0,10)
+      : "",
+    time: row.entry_time || row.created_at || "",
+    timeText: row.entry_time
+      ? new Date(row.entry_time).toLocaleTimeString("ar-KW")
       : "-",
     civilId: row.civil_id || "",
-    name: row.person_name || "",
-    type: type,
-    status: row.status === "accepted" ? "مقبول" : "مرفوض",
-    securityUser: row.entry_by || "",
-    exitSecurityUser: row.exit_by || "",
+    name: row.full_name || "",
+    type: row.type || "",
+    status: row.status || "",
+    securityUser: row.security_user || "",
+    exitSecurityUser: row.exit_security_user || "",
     exitTime: row.exit_time || "",
     exitTimeText: row.exit_time
       ? new Date(row.exit_time).toLocaleTimeString("ar-KW")
@@ -1178,30 +1176,6 @@ function dbToLog(row){
     reason: row.reason || ""
   };
 }
-
-async function loadCustomFieldsFromSupabase(){
-  const { data, error } = await supabaseClient
-    .from("custom_fields")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if(error){
-    console.error("خطأ تحميل الحقول:", error);
-    toast("تعذر تحميل الحقول من Supabase", false);
-    return;
-  }
-
-  customFields = (data || []).map(row => ({
-    id: row.id,
-    key: row.field_key,
-    label: row.field_label,
-    type: row.field_type,
-    required: row.is_required,
-    system: false,
-    active: row.is_active
-  }));
-}
-
 async function loadPeopleFromSupabase(){
   const { data, error } = await supabaseClient
     .from("permits")
@@ -1234,68 +1208,63 @@ async function loadLogsFromSupabase(){
 }
 
 async function loadAllData(){
-  await loadCustomFieldsFromSupabase();
-  await loadPeopleFromSupabase();
-  await loadLogsFromSupabase();
+  await Promise.all([
+    loadPeopleFromSupabase(),
+    loadLogsFromSupabase()
+  ]);
 }
 
 
+async function deleteIndividualLog(logId){
+  const log = logs.find(l => String(l.id) === String(logId));
 
-async function clearAllReports(){
-  if(!logs.length){
-    toast("لا توجد تقارير لمسحها",false);
+  if(!log){
+    toast("السجل غير موجود", false);
     return;
   }
 
-  const confirmed=confirm(
-    "تحذير!\n\n"+
-    "هل أنت متأكد من مسح جميع التقارير؟\n"+
-    "سيتم حذف عمليات الدخول والخروج ومحاولات الرفض.\n\n"+
-    "لا يمكن التراجع عن هذه العملية."
+  const confirmed = confirm(
+    "هل تريد حذف سجل هذا الشخص؟\n\n" +
+    "الاسم: " + (log.name || "-") + "\n" +
+    "الرقم المدني: " + (log.civilId || "-") + "\n\n" +
+    "سيتم حذف سجل الدخول والخروج المرتبط بهذا الشخص."
   );
 
-  if(!confirmed)return;
+  if(!confirmed) return;
 
   const { error } = await supabaseClient
-  .from("gate_logs")
-  .delete()
-  .neq("id", 0);
+    .from("gate_logs")
+    .delete()
+    .eq("id", logId);
 
-if(error){
-  console.error(error);
-  return toast("تعذر مسح التقارير", false);
-}
-
-logs = [];
-
-
-  if(!$("adminPage").classList.contains("hidden")){
-    await loadAllData();
-renderAdminPage();
-
+  if(error){
+    console.error(error);
+    toast("تعذر حذف السجل: " + error.message, false);
+    return;
   }
 
+  // حذف السجل من القائمة الموجودة داخل المتصفح
+  logs = logs.filter(
+    l => String(l.id) !== String(logId)
+  );
+
+  // تحديث الصفحة الإدارية
+  if(!$("adminPage").classList.contains("hidden")){
+    renderAdminPage();
+  }
+
+  // تحديث صفحة الأمن إذا كانت مفتوحة
   if(!$("securityPage").classList.contains("hidden")){
-  await loadAllData();
-  refreshSecurity();
+    refreshSecurity();
+  }
+
+  toast("تم حذف سجل الشخص بنجاح");
 }
-
-
-  toast("تم مسح جميع التقارير بنجاح");
-}
-
-
-
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function formatDate(v){if(!v)return"-";let p=String(v).split("-");return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:v}
 function allFields(){return[...BASE_FIELDS,...customFields]}
-function activeFields(){
-  return allFields().filter(f =>
-    f.system || f.active !== false
-  );
-}
-
+function activeFields(){return allFields().filter(f=>!disabledFields.includes(f.key))}
 function toast(m,ok=true){$("toast").textContent=m;$("toast").style.background=ok?"#087b42":"#b52323";$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",3000)}
 function selectLoginType(t){
   loginType = t;
@@ -1373,10 +1342,8 @@ $("loginForm").addEventListener("submit", async e => {
     $("securityUserName").textContent =
       "مستخدم الأمن: " + email;
 
-    await loadAllData();
-refreshSecurity();
-return;
-
+    refreshSecurity();
+    return;
   }
 
   if (loginType === "permits") {
@@ -1388,25 +1355,21 @@ return;
     $("loginPage").classList.add("hidden");
     $("permitsPage").classList.remove("hidden");
 
-    await loadAllData();
-renderPermitsPage();
-return;
-
+    renderPermitsPage();
+    return;
   }
 
   if (loginType === "admin") {
-  sessionStorage.setItem(
-    "gateAdminLoggedIn",
-    "true"
-  );
+    sessionStorage.setItem(
+      "gateAdminLoggedIn",
+      "true"
+    );
 
-  $("loginPage").classList.add("hidden");
-  $("adminPage").classList.remove("hidden");
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
 
-  await loadAllData();
-  renderAdminPage();
-}
-
+    renderAdminPage();
+  }
 });
 
 async function logout(){
@@ -1471,12 +1434,7 @@ function renderPerson(p){
           ${esc(
             ["permitStart","permitEnd"].includes(f.key)
               ? formatDate(p[f.key])
-              : (
-    p[f.key] ||
-    p.customData?.[f.key] ||
-    "-"
-  )
-
+              : p[f.key]||"-"
           )}
         </span>
       </div>
@@ -1546,21 +1504,19 @@ function renderPerson(p){
 }
 
 async function addLog(x){
-  const { data: userData } =
-    await supabaseClient.auth.getUser();
-
-  const userId = userData.user?.id || null;
-  const isEntry = x.type === "دخول";
+  const user = await supabaseClient.auth.getUser();
 
   const row = {
     permit_id: currentPerson?.id || null,
     civil_id: x.civilId || currentPerson?.civilId || "",
-    person_name: x.name || currentPerson?.name || "غير مسجل",
-    operation_type: isEntry ? "entry" : "rejected",
-    status: isEntry ? "accepted" : "rejected",
-    reason: x.reason || "",
+    full_name: x.name || currentPerson?.name || "",
+    type: x.type || "",
+    status: x.status || "",
+    security_user: user.data.user?.email || "غير محدد",
+    exit_security_user: null,
     entry_time: new Date().toISOString(),
-    entry_by: userId
+    exit_time: null,
+    reason: x.reason || ""
   };
 
   const { data, error } = await supabaseClient
@@ -1609,11 +1565,7 @@ async function entry(){
 }
 
 async function exit(){
-  if(!currentPerson){
-    return toast("لم يتم اختيار شخص", false);
-  }
-
-  const l = logs.find(x =>
+  let l = logs.find(x =>
     x.date === localDateKey() &&
     x.civilId === currentPerson.civilId &&
     x.type === "دخول" &&
@@ -1624,16 +1576,14 @@ async function exit(){
     return toast("لا يوجد دخول مفتوح", false);
   }
 
-  const { data: userData } =
-    await supabaseClient.auth.getUser();
-
+  const user = await supabaseClient.auth.getUser();
   const exitTime = new Date().toISOString();
 
   const { error } = await supabaseClient
     .from("gate_logs")
     .update({
       exit_time: exitTime,
-      exit_by: userData.user?.id || null
+      exit_security_user: user.data.user?.email || "غير محدد"
     })
     .eq("id", l.id);
 
@@ -1643,21 +1593,17 @@ async function exit(){
   }
 
   l.exitTime = exitTime;
-  l.exitTimeText =
-    new Date(exitTime).toLocaleTimeString("ar-KW");
+  l.exitTimeText = new Date(exitTime)
+    .toLocaleTimeString("ar-KW");
 
   l.exitSecurityUser =
-    userData.user?.email || userData.user?.id || "غير محدد";
+    user.data.user?.email || "غير محدد";
 
   refreshSecurity();
   toast("تم تسجيل الخروج بنجاح");
 }
 
 async function reject(){
-  if(!currentPerson){
-    return toast("لم يتم اختيار شخص", false);
-  }
-
   let r = prompt(
     "اكتب سبب رفض الدخول:",
     "التصريح غير مستوفٍ"
@@ -1666,8 +1612,8 @@ async function reject(){
   if(r === null) return;
 
   const result = await addLog({
-    civilId: currentPerson.civilId,
-    name: currentPerson.name,
+    civilId: currentPerson?.civilId || "",
+    name: currentPerson?.name || "غير مسجل",
     type: "محاولة دخول",
     status: "مرفوض",
     reason: r || "غير محدد"
@@ -1700,161 +1646,26 @@ function renderLogs(){let a=logs.filter(l=>l.date===localDateKey());$("logsConta
 function makeInput(f,prefix,value=""){let id=prefix+f.key;if(f.type==="file")return`<div><label>${esc(f.label)}</label><input id="${id}" type="file" accept="image/*"></div>`;if(f.type==="textarea")return`<div><label>${esc(f.label)}</label><textarea id="${id}">${esc(value)}</textarea></div>`;return`<div><label>${esc(f.label)}</label><input id="${id}" type="${f.type}" value="${esc(value)}" ${f.required?"required":""}></div>`}
 function renderPermitFields(){$("permitFields").innerHTML=activeFields().map(f=>makeInput(f,"new_")).join("")}
 function fileData(f){return new Promise((res,rej)=>{if(!f)return res("");let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
-$("permitForm").addEventListener("submit", async e => {
-  e.preventDefault();
+$("permitForm").addEventListener("submit",async e=>{e.preventDefault();let p={};for(let f of allFields()){let i=$("new_"+f.key);p[f.key]=f.type==="file"?await fileData(i?.files[0]):i?.value.trim()||""}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x.civilId===p.civilId))return toast("يوجد تصريح بهذا الرقم المدني",false);const { data, error } = await supabaseClient
+  .from("permits")
+  .insert(permitToDb(p))
+  .select()
+  .single();
 
-  let p = {
-    customData: {}
-  };
-
-  for(const f of allFields()){
-    const input = $("new_" + f.key);
-
-    if(f.type === "file"){
-      p[f.key] = await fileData(input?.files[0]);
-    }else{
-      const value = input?.value.trim() || "";
-
-      if(f.system){
-        p[f.key] = value;
-      }else{
-        p.customData[f.key] = value;
-      }
-    }
-  }
-
-  if(!p.civilId || !p.name){
-    return toast("الرقم المدني والاسم مطلوبان", false);
-  }
-
-  if(people.some(x => x.civilId === p.civilId)){
-    return toast("يوجد تصريح بهذا الرقم المدني", false);
-  }
-
-  const { data, error } = await supabaseClient
-    .from("permits")
-    .insert(permitToDb(p))
-    .select()
-    .single();
-
-  if(error){
-    console.error(error);
-    return toast("تعذر حفظ التصريح: " + error.message, false);
-  }
-
-  people.unshift(dbToPermit(data));
-
-  e.target.reset();
-  renderPermitsPage();
-  toast("تم حفظ التصريح بنجاح");
-});
-
- 
-async function addCustomField(){
-  const label = $("newFieldName").value.trim();
-
-  if(!label){
-    return toast("اكتب اسم الحقل أولًا", false);
-  }
-
-  let key = label.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g, "_");
-  let number = 2;
-  let finalKey = key;
-
-  while(allFields().some(f => f.key === finalKey)){
-    finalKey = key + "_" + number++;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("custom_fields")
-    .insert({
-      field_key: finalKey,
-      field_label: label,
-      field_type: "text",
-      is_required: false,
-      is_active: true
-    })
-    .select()
-    .single();
-
-  if(error){
-    console.error(error);
-    return toast("تعذر إضافة الحقل: " + error.message, false);
-  }
-
-  customFields.push({
-    id: data.id,
-    key: data.field_key,
-    label: data.field_label,
-    type: data.field_type,
-    required: data.is_required,
-    system: false,
-    active: data.is_active
-  });
-
-  $("newFieldName").value = "";
-  renderPermitsPage();
-  toast("تمت إضافة الحقل");
+if(error){
+  console.error(error);
+  return toast("تعذر حفظ التصريح: " + error.message, false);
 }
 
-async function toggleField(k){
-  const field = customFields.find(f => f.key === k);
+people.unshift(dbToPermit(data));
 
-  if(!field){
-    return toast("الحقل غير موجود", false);
-  }
-
-  const newStatus = field.active === false;
-
-  const { error } = await supabaseClient
-    .from("custom_fields")
-    .update({
-      is_active: newStatus
-    })
-    .eq("id", field.id);
-
-  if(error){
-    console.error(error);
-    return toast("تعذر تعديل حالة الحقل", false);
-  }
-
-  field.active = newStatus;
-
-  renderPermitsPage();
-
-    toast(
-    newStatus ? "تمت إعادة تفعيل الحقل" : "تم إلغاء الحقل"
-  );
-}
-
-async function deleteCustomField(k){
-
-  const field = customFields.find(f => f.key === k);
-
-  if(!field){
-    return toast("الحقل غير موجود", false);
-  }
-
-  if(!confirm("هل تريد حذف الحقل نهائيًا؟")){
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("custom_fields")
-    .delete()
-    .eq("id", field.id);
-
-  if(error){
-    console.error(error);
-    return toast("تعذر حذف الحقل: " + error.message, false);
-  }
-
-  customFields = customFields.filter(f => f.key !== k);
-
-  renderPermitsPage();
-  toast("تم حذف الحقل نهائيًا");
-}
-
+e.target.reset();
+renderPermitsPage();
+toast("تم حفظ التصريح بنجاح");
+})
+function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
+function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
+function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
 async function cancelPermit(){
   let c = $("cancelCivilId").value.trim();
   let p = people.find(x => x.civilId === c);
@@ -1884,205 +1695,13 @@ async function cancelPermit(){
   toast("تم إلغاء التصريح");
 }
 
-function renderFields(){
-  $("allFieldsList").innerHTML = allFields().map(f => {
-    const disabled = !f.system && f.active === false;
-
-    return `
-      <div class="field-row">
-        <div>
-          <b>${esc(f.label)}</b>
-          <small>
-            ${f.system ? "حقل أساسي" : "حقل مخصص"} -
-            ${disabled ? "غير فعال" : "فعال"}
-          </small>
-        </div>
-
-        <div class="field-actions">
-          ${
-            f.system
-              ? ""
-              : `
-                <button
-                  class="${disabled ? "green" : "red"}"
-                  onclick="toggleField('${esc(f.key)}')">
-                  ${disabled ? "إعادة تفعيل" : "إلغاء الحقل"}
-                </button>
-
-                <button
-                  class="gray"
-                  onclick="deleteCustomField('${esc(f.key)}')">
-                  حذف نهائي
-                </button>
-              `
-          }
-        </div>
-      </div>
-    `;
-  }).join("");
-}
-
+function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
-function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields()
-  .map(f => makeInput(
-    f,
-    "edit_",
-    f.system
-      ? p[f.key]
-      : p.customData?.[f.key] || ""
-  ))
-  .join("")
-}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
-async function saveEdit(e){
-  e.preventDefault();
-
-  const p = people.find(x => x.civilId === editingCivilId);
-
-  if(!p){
-    return toast("التصريح غير موجود", false);
-  }
-
-  const oldCivilId = p.civilId;
-  const customData = {};
-
-  for(const f of allFields()){
-    const input = $("edit_" + f.key);
-
-    if(!input) continue;
-
-    if(f.type === "file"){
-      if(input.files[0]){
-        p[f.key] = await fileData(input.files[0]);
-      }
-    }else{
-      const value = input.value.trim();
-
-      if(f.system){
-        p[f.key] = value;
-      }else{
-        customData[f.key] = value;
-      }
-    }
-  }
-
-  p.customData = {
-    ...(p.customData || {}),
-    ...customData
-  };
-
-  if(!p.civilId || !p.name){
-    return toast("الرقم المدني والاسم مطلوبان", false);
-  }
-
-  if(people.some(x =>
-    x !== p && x.civilId === p.civilId
-  )){
-    return toast("الرقم المدني مستخدم في تصريح آخر", false);
-  }
-
-  const { data, error } = await supabaseClient
-    .from("permits")
-    .update(permitToDb(p))
-    .eq("id", p.id)
-    .select()
-    .single();
-
-  if(error){
-    console.error(error);
-    return toast("تعذر حفظ التعديلات: " + error.message, false);
-  }
-
-  const updatedPermit = dbToPermit(data);
-  const index = people.findIndex(x => x.id === p.id);
-  people[index] = updatedPermit;
-
-  if(oldCivilId !== updatedPermit.civilId){
-    logs.forEach(l => {
-      if(l.civilId === oldCivilId){
-        l.civilId = updatedPermit.civilId;
-      }
-    });
-  }
-
-  editingCivilId = null;
-  renderPermitsPage();
-  toast("تم تعديل التصريح بنجاح");
-}
-
+function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
+async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});saveLogs();savePeople();editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
 function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
-function renderAdminPage(){
-  const entries =
-    logs.filter(l => l.type === "دخول").length;
-
-  const exits =
-    logs.filter(l => l.exitTime).length;
-
-  const rejected =
-    logs.filter(l => l.status === "مرفوض").length;
-
-  const todayEntries =
-    logs.filter(l =>
-      l.date === localDateKey() &&
-      l.type === "دخول"
-    ).length;
-
-  $("adminTotalEntries").textContent = entries;
-  $("adminTotalExits").textContent = exits;
-  $("adminTotalRejected").textContent = rejected;
-  $("adminTodayEntries").textContent = todayEntries;
-
-  const users = [
-    ...new Set(
-      logs
-        .map(l => l.securityUser)
-        .filter(Boolean)
-    )
-  ];
-
-  $("securityUsersStats").innerHTML =
-    !users.length
-      ? `<div class="empty">لا توجد إحصائيات للمستخدمين</div>`
-      : `
-        <div class="table-wrapper">
-          <table>
-            <tr>
-              <th>المستخدم</th>
-              <th>الدخول</th>
-              <th>الخروج</th>
-              <th>المرفوض</th>
-            </tr>
-
-            ${users.map(user => `
-              <tr>
-                <td>${esc(user)}</td>
-                <td>
-                  ${logs.filter(l =>
-                    l.securityUser === user &&
-                    l.type === "دخول"
-                  ).length}
-                </td>
-                <td>
-                  ${logs.filter(l =>
-                    l.exitSecurityUser === user
-                  ).length}
-                </td>
-                <td>
-                  ${logs.filter(l =>
-                    l.securityUser === user &&
-                    l.status === "مرفوض"
-                  ).length}
-                </td>
-              </tr>
-            `).join("")}
-          </table>
-        </div>
-      `;
-
-  renderAdminLogs();
-  showInsidePeople();
-}
-
+function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople()}
 
 
 function showInsidePeople(){
@@ -2163,7 +1782,8 @@ function renderAdminLogs(){
           <th>وقت الخروج</th>
           <th>مستخدم الخروج</th>
           <th>السبب</th>
-        </tr>
+<th>الإجراء</th>
+
 
         ${a.map(l=>`
           <tr>
@@ -2176,7 +1796,18 @@ function renderAdminLogs(){
             <td>${l.type==="دخول"?esc(l.securityUser||"-"):"-"}</td>
             <td>${esc(l.exitTimeText||"لم يسجل خروج")}</td>
             <td>${esc(l.exitSecurityUser||"-")}</td>
-            <td>${esc(l.reason||"-")}</td>
+            <td>${esc(l.reason || "-")}</td>
+
+<td>
+  <button
+    class="red"
+    style="min-height:36px;padding:7px 11px;font-size:12px"
+    onclick="deleteIndividualLog('${l.id}')"
+  >
+    حذف
+  </button>
+</td>
+
           </tr>
         `).join("")}
       </table>
@@ -2275,13 +1906,7 @@ ${m}`;
 }
 
 function initialize(){let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
-async function startApp(){
-  await loadAllData();
-  initialize();
-}
-
-startApp();
-
+initialize();
 </script>
 </body>
 </html>
