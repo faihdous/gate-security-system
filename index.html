@@ -1215,6 +1215,8 @@ async function loadAllData(){
 }
 
 
+
+
 async function deleteIndividualLog(logId){
   const log = logs.find(l => String(l.id) === String(logId));
 
@@ -1259,6 +1261,42 @@ async function deleteIndividualLog(logId){
   }
 
   toast("تم حذف سجل الشخص بنجاح");
+}
+async function clearAllReports(){
+  if(!logs.length){
+    toast("لا توجد تقارير لمسحها", false);
+    return;
+  }
+
+  const confirmed = confirm(
+    "هل أنت متأكد من حذف جميع التقارير؟\n\n" +
+    "لا يمكن التراجع عن هذه العملية."
+  );
+
+  if(!confirmed) return;
+
+  const { error } = await supabaseClient
+    .from("gate_logs")
+    .delete()
+    .not("id", "is", null);
+
+  if(error){
+    console.error(error);
+    toast("تعذر مسح التقارير: " + error.message, false);
+    return;
+  }
+
+  logs = [];
+
+  if(!$("adminPage").classList.contains("hidden")){
+    renderAdminPage();
+  }
+
+  if(!$("securityPage").classList.contains("hidden")){
+    refreshSecurity();
+  }
+
+  toast("تم مسح جميع التقارير بنجاح");
 }
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
@@ -1747,28 +1785,29 @@ function showInsidePeople(){
 }
 
 function renderAdminLogs(){
-  let q=$("adminLogSearch").value.toLowerCase().trim();
+  let q = $("adminLogSearch").value.toLowerCase().trim();
 
-  let a=logs.filter(l=>{
-    let text=[
+  let a = logs.filter(l => {
+    let text = [
       l.name,
       l.civilId,
       l.securityUser,
       l.exitSecurityUser,
       l.type,
-      l.status
+      l.status,
+      l.reason
     ].join(" ").toLowerCase();
 
     return !q || text.includes(q);
   });
 
   if(!a.length){
-    $("adminLogsTable").innerHTML=
+    $("adminLogsTable").innerHTML =
       `<div class="empty">لا توجد سجلات</div>`;
     return;
   }
 
-  $("adminLogsTable").innerHTML=`
+  $("adminLogsTable").innerHTML = `
     <div class="table-wrapper">
       <table>
         <tr>
@@ -1782,38 +1821,47 @@ function renderAdminLogs(){
           <th>وقت الخروج</th>
           <th>مستخدم الخروج</th>
           <th>السبب</th>
-<th>الإجراء</th>
+          <th>الإجراء</th>
+        </tr>
 
-
-        ${a.map(l=>`
+        ${a.map(l => `
           <tr>
             <td>${formatDate(l.date)}</td>
             <td>${esc(l.name)}</td>
             <td>${esc(l.civilId)}</td>
             <td>${esc(l.type)}</td>
             <td>${esc(l.status)}</td>
-            <td>${l.type==="دخول"?esc(l.timeText||"-"):"-"}</td>
-            <td>${l.type==="دخول"?esc(l.securityUser||"-"):"-"}</td>
-            <td>${esc(l.exitTimeText||"لم يسجل خروج")}</td>
-            <td>${esc(l.exitSecurityUser||"-")}</td>
+            <td>
+              ${l.type === "دخول"
+                ? esc(l.timeText || "-")
+                : "-"
+              }
+            </td>
+            <td>
+              ${l.type === "دخول"
+                ? esc(l.securityUser || "-")
+                : "-"
+              }
+            </td>
+            <td>${esc(l.exitTimeText || "لم يسجل خروج")}</td>
+            <td>${esc(l.exitSecurityUser || "-")}</td>
             <td>${esc(l.reason || "-")}</td>
-
-<td>
-  <button
-    class="red"
-    style="min-height:36px;padding:7px 11px;font-size:12px"
-    onclick="deleteIndividualLog('${l.id}')"
-  >
-    حذف
-  </button>
-</td>
-
+            <td>
+              <button
+                class="red"
+                style="min-height:36px;padding:7px 11px;font-size:12px"
+                onclick="deleteIndividualLog('${l.id}')"
+              >
+                حذف
+              </button>
+            </td>
           </tr>
         `).join("")}
       </table>
     </div>
   `;
 }
+
 
 
 function cardPlaceholder(){
@@ -1906,7 +1954,11 @@ ${m}`;
 }
 
 function initialize(){let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
-initialize();
+(async function(){
+  await loadAllData();
+  initialize();
+})();
+
 </script>
 </body>
 </html>
