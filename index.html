@@ -1052,6 +1052,12 @@ tbody tr:last-child td{
 
 <div id="adminLogsTable"></div>
 </section>
+
+<section class="card">
+  <h2>سجل تعديلات النظام</h2>
+  <div id="auditLogsTable"></div>
+</section>
+
 </main>
 </section>
 
@@ -1214,6 +1220,37 @@ async function loadAllData(){
   ]);
 }
 
+async function addAudit(action, details=""){
+  const { data } = await supabaseClient.auth.getUser();
+  const user = data.user;
+
+  const { error } = await supabaseClient
+    .from("audit_logs")
+    .insert({
+      action: action,
+      details: details,
+      user_id: user?.id || null,
+      username: user?.email || "غير محدد"
+    });
+
+  if(error){
+    console.error("خطأ سجل التعديلات:", error);
+  }
+}
+
+async function loadAuditLogs(){
+  const { data, error } = await supabaseClient
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending:false });
+
+  if(error){
+    console.error("خطأ تحميل سجل التعديلات:", error);
+    return [];
+  }
+
+  return data || [];
+}
 
 
 
@@ -1249,6 +1286,10 @@ async function deleteIndividualLog(logId){
   logs = logs.filter(
     l => String(l.id) !== String(logId)
   );
+await addAudit(
+  "حذف تقرير",
+  `تم حذف تقرير الرقم المدني: ${log.civilId} والاسم: ${log.name}`
+);
 
   // تحديث الصفحة الإدارية
   if(!$("adminPage").classList.contains("hidden")){
@@ -1287,6 +1328,11 @@ async function clearAllReports(){
   }
 
   logs = [];
+await addAudit(
+  "مسح جميع التقارير",
+  "تم مسح جميع تقارير الدخول والخروج"
+);
+
 
   if(!$("adminPage").classList.contains("hidden")){
     renderAdminPage();
@@ -1697,6 +1743,11 @@ if(error){
 
 people.unshift(dbToPermit(data));
 
+await addAudit(
+  "إضافة تصريح",
+  `تمت إضافة تصريح للرقم المدني: ${p.civilId} والاسم: ${p.name}`
+);
+
 e.target.reset();
 renderPermitsPage();
 toast("تم حفظ التصريح بنجاح");
@@ -1727,6 +1778,11 @@ async function cancelPermit(){
   }
 
   people = people.filter(x => x.id !== p.id);
+await addAudit(
+  "إلغاء تصريح",
+  `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
+);
+
 
   $("cancelCivilId").value = "";
   renderPermitsPage();
@@ -1736,10 +1792,39 @@ async function cancelPermit(){
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
 function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
-async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});saveLogs();savePeople();editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
+async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});const { error } = await supabaseClient
+  .from("permits")
+  .update({
+    civil_id: p.civilId,
+    full_name: p.name,
+    company: p.company || "",
+    job: p.job || "",
+    phone: p.phone || "",
+    permit_start: p.permitStart || null,
+    permit_end: p.permitEnd || null,
+    allowed_area: p.allowedArea || "",
+    card_image_path: p.cardImage || "",
+    notes: p.notes || "",
+    custom_data: p.customData || {},
+    updated_by: (await supabaseClient.auth.getUser()).data.user?.id || null,
+    updated_at: new Date().toISOString()
+  })
+  .eq("id", p.id);
+
+if(error){
+  console.error(error);
+  return toast("تعذر حفظ التعديلات: " + error.message, false);
+}
+
+await addAudit(
+  "تعديل تصريح",
+  `تم تعديل تصريح الرقم المدني من ${old} إلى ${p.civilId}`
+);
+editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
 function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
-function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople()}
+function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople();renderAuditLogs();}
+
 
 
 function showInsidePeople(){
@@ -1777,6 +1862,37 @@ function showInsidePeople(){
                 موجود داخل المبنى
               </span>
             </td>
+          </tr>
+        `).join("")}
+      </table>
+    </div>
+  `;
+}
+async function renderAuditLogs(){
+  const data = await loadAuditLogs();
+
+  if(!data.length){
+    $("auditLogsTable").innerHTML =
+      `<div class="empty">لا توجد تعديلات مسجلة</div>`;
+    return;
+  }
+
+  $("auditLogsTable").innerHTML = `
+    <div class="table-wrapper">
+      <table>
+        <tr>
+          <th>التاريخ</th>
+          <th>المستخدم</th>
+          <th>العملية</th>
+          <th>التفاصيل</th>
+        </tr>
+
+        ${data.map(a => `
+          <tr>
+            <td>${esc(new Date(a.created_at).toLocaleString("ar-KW"))}</td>
+            <td>${esc(a.username || "غير محدد")}</td>
+            <td>${esc(a.action)}</td>
+            <td>${esc(a.details || "-")}</td>
           </tr>
         `).join("")}
       </table>
