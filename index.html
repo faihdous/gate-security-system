@@ -1195,14 +1195,7 @@ async function loadPeopleFromSupabase(){
     return;
   }
 
-  people = (data || []).map(row => {
-    const person = dbToPermit(row);
-
-    return {
-      ...person,
-      civilId: String(person.civilId || "").trim()
-    };
-  });
+  people = (data || []).map(dbToPermit);
 }
 
 async function loadLogsFromSupabase(){
@@ -1505,46 +1498,7 @@ async function adminLogout(){
 }
 
 function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
-function searchPerson(){
-  const c = ($("civilId").value || "").trim();
-
-  if(!c){
-    toast("أدخل الرقم المدني أولًا", false);
-    return;
-  }
-
-  const p = people.find(x =>
-    String(x.civilId || "").trim() === c
-  );
-
-  if(!p){
-    currentPerson = null;
-
-    $("personResult").classList.remove("hidden");
-
-    $("personResult").innerHTML = `
-      <div>
-        <h2>لا يوجد تصريح</h2>
-        <p>
-          لم يتم العثور على الرقم المدني:
-          <b>${esc(c)}</b>
-        </p>
-
-        <button
-          class="red"
-          onclick="unknownReject('${esc(c)}')">
-          تسجيل محاولة مرفوضة
-        </button>
-      </div>
-    `;
-
-    return;
-  }
-
-  currentPerson = p;
-  renderPerson(p);
-}
-
+function searchPerson(){let c=$("civilId").value.trim(),p=people.find(x=>x.civilId===c);if(!c){toast("أدخل الرقم المدني أولًا",false);return}if(!p){currentPerson=null;$("personResult").classList.remove("hidden");$("personResult").innerHTML=`<div><h2>لا يوجد تصريح</h2><p>لم يتم العثور على الرقم المدني: <b>${esc(c)}</b></p><button class="red" onclick="unknownReject('${esc(c)}')">تسجيل محاولة مرفوضة</button></div>`;return}currentPerson=p;renderPerson(p)}
 function renderPerson(p){
   let s=status(p);
 
@@ -1836,125 +1790,9 @@ await addAudit(
 }
 
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
-function searchPermitForEdit(){
-  const inputValue = $("permitSearchCivilId").value || "";
-  const c = inputValue.trim();
-
-  if(!c){
-    $("permitSearchResult").innerHTML =
-      `<div class="empty">أدخل الرقم المدني أولًا.</div>`;
-    return;
-  }
-
-  const p = people.find(x =>
-    String(x.civilId || "").trim() === c
-  );
-
-  if(!p){
-    $("permitSearchResult").innerHTML = `
-      <div class="empty">
-        لم يتم العثور على تصريح بهذا الرقم المدني.
-        <br>
-        الرقم الذي تم البحث عنه:
-        <b>${esc(c)}</b>
-      </div>
-    `;
-    return;
-  }
-
-  $("permitSearchResult").innerHTML = `
-    <div class="edit-box">
-      <h3>تعديل تصريح: ${esc(p.name)}</h3>
-
-      <button
-        class="orange"
-        onclick="startEdit('${esc(p.civilId)}')">
-        تعديل جميع بيانات التصريح
-      </button>
-
-      <button
-        class="red"
-        onclick="$('cancelCivilId').value='${esc(p.civilId)}';cancelPermit()">
-        إلغاء التصريح
-      </button>
-    </div>
-  `;
-}
-
+function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
 function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
-async function searchPermitForEdit(){
-  const inputValue = $("permitSearchCivilId").value || "";
-  const c = inputValue.trim();
-
-  if(!c){
-    $("permitSearchResult").innerHTML =
-      `<div class="empty">أدخل الرقم المدني أولًا.</div>`;
-    return;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("permits")
-    .select("*")
-    .eq("civil_id", c)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if(error){
-    console.error("خطأ البحث عن التصريح:", error);
-
-    $("permitSearchResult").innerHTML = `
-      <div class="empty">
-        حدث خطأ أثناء البحث عن التصريح.
-        <br>
-        ${esc(error.message)}
-      </div>
-    `;
-
-    return;
-  }
-
-  if(!data){
-    $("permitSearchResult").innerHTML = `
-      <div class="empty">
-        لم يتم العثور على تصريح بهذا الرقم المدني.
-        <br>
-        الرقم الذي تم البحث عنه:
-        <b>${esc(c)}</b>
-      </div>
-    `;
-
-    return;
-  }
-
-  const p = dbToPermit(data);
-
-  const oldPersonIndex = people.findIndex(x => x.id === p.id);
-
-  if(oldPersonIndex >= 0){
-    people[oldPersonIndex] = p;
-  }else{
-    people.unshift(p);
-  }
-
-  $("permitSearchResult").innerHTML = `
-    <div class="edit-box">
-      <h3>تعديل تصريح: ${esc(p.name)}</h3>
-
-      <button
-        class="orange"
-        onclick="startEdit('${esc(p.civilId)}')">
-        تعديل جميع بيانات التصريح
-      </button>
-
-      <button
-        class="red"
-        onclick="$('cancelCivilId').value='${esc(p.civilId)}';cancelPermit()">
-        إلغاء التصريح
-      </button>
-    </div>
-  `;
-}
-
+async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});const { error } = await supabaseClient
   .from("permits")
   .update({
     civil_id: p.civilId,
