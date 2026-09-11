@@ -1824,7 +1824,80 @@ async function unknownReject(c){
 
 function refreshSecurity(){updateSecurity();renderLogs();if(currentPerson)renderPerson(currentPerson)}
 function updateSecurity(){$("totalPeople").textContent=people.length;$("activePermits").textContent=people.filter(p=>status(p).allowed).length;$("insideCount").textContent=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول"&&!l.exitTime).length;$("todayLogs").textContent=logs.filter(l=>l.date===localDateKey()).length}
-function renderLogs(){let a=logs.filter(l=>l.date===localDateKey());$("logsContainer").innerHTML=!a.length?`<div class="empty">لا توجد عمليات اليوم</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>العملية</th><th>الحالة</th><th>المستخدم</th><th>الوقت</th><th>الخروج</th><th>السبب</th></tr>${a.map(l=>`<tr><td>${esc(l.name)}</td><td>${esc(l.civilId)}</td><td>${esc(l.type)}</td><td>${esc(l.status)}</td><td>${esc(l.securityUser)}</td><td>${esc(l.timeText)}</td><td>${esc(l.exitTimeText||"-")}</td><td>${esc(l.reason||"-")}</td></tr>`).join("")}</table></div>`}
+function renderLogs(){
+
+  let todayLogs = logs.filter(function(log){
+    return log.date === localDateKey();
+  });
+
+  if(!todayLogs.length){
+    $("logsContainer").innerHTML =
+      `<div class="empty">لا توجد عمليات اليوم</div>`;
+
+    return;
+  }
+
+  $("logsContainer").innerHTML = `
+    <div class="table-wrapper">
+      <table>
+
+        <thead>
+          <tr>
+            <th>الاسم</th>
+            <th>الرقم المدني</th>
+            <th>العملية</th>
+            <th>الحالة</th>
+            <th>مستخدم تسجيل الدخول</th>
+            <th>وقت الدخول</th>
+            <th>وقت الخروج</th>
+            <th>مستخدم تسجيل الخروج</th>
+            <th>السبب</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${todayLogs.map(function(log){
+
+            return `
+              <tr>
+                <td>${esc(log.name || "-")}</td>
+
+                <td>${esc(log.civilId || "-")}</td>
+
+                <td>${esc(log.type || "-")}</td>
+
+                <td>${esc(log.status || "-")}</td>
+
+                <td>
+                  ${esc(log.securityUser || "-")}
+                </td>
+
+                <td>
+                  ${esc(log.timeText || "-")}
+                </td>
+
+                <td>
+                  ${esc(log.exitTimeText || "لم يسجل خروج")}
+                </td>
+
+                <td>
+                  ${esc(log.exitSecurityUser || "لم يسجل خروج")}
+                </td>
+
+                <td>
+                  ${esc(log.reason || "-")}
+                </td>
+              </tr>
+            `;
+
+          }).join("")}
+        </tbody>
+
+      </table>
+    </div>
+  `;
+}
+
 function makeInput(f,prefix,value=""){let id=prefix+f.key;if(f.type==="file")return`<div><label>${esc(f.label)}</label><input id="${id}" type="file" accept="image/*"></div>`;if(f.type==="textarea")return`<div><label>${esc(f.label)}</label><textarea id="${id}">${esc(value)}</textarea></div>`;return`<div><label>${esc(f.label)}</label><input id="${id}" type="${f.type}" value="${esc(value)}" ${f.required?"required":""}></div>`}
 function renderPermitFields(){$("permitFields").innerHTML=activeFields().map(f=>makeInput(f,"new_")).join("")}
 function fileData(f){return new Promise((res,rej)=>{if(!f)return res("");let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
