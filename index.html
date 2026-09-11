@@ -1030,7 +1030,7 @@ tbody tr:last-child td{
   <div id="insidePeopleTable" style="margin-top:18px"></div>
 </section>
 
-<section class="card"><h2>إحصائيات مستخدمي الأمن</h2><div id="securityUsersStats"></div></section>
+
 <section class="card">
 <h2>تفاصيل عمليات الدخول والخروج</h2>
 <div class="search-row">
@@ -1813,7 +1813,24 @@ await addAudit(
 editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
 function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
-function renderAdminPage(){let e=logs.filter(l=>l.type==="دخول").length,x=logs.filter(l=>l.exitTime).length,r=logs.filter(l=>l.status==="مرفوض").length,t=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول").length;$("adminTotalEntries").textContent=e;$("adminTotalExits").textContent=x;$("adminTotalRejected").textContent=r;$("adminTodayEntries").textContent=t;$("securityUsersStats").innerHTML=`<div class="table-wrapper"><table><tr><th>المستخدم</th><th>الدخول</th><th>الخروج</th><th>المرفوض</th></tr>${SECURITY_USERS.map(u=>`<tr><td>${u.username}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.type==="دخول").length}</td><td>${logs.filter(l=>(l.securityUser===u.username||l.exitSecurityUser===u.username)&&l.exitTime).length}</td><td>${logs.filter(l=>l.securityUser===u.username&&l.status==="مرفوض").length}</td></tr>`).join("")}</table></div>`;renderAdminLogs();showInsidePeople();renderAuditLogs();}
+function renderAdminPage(){
+  let e = logs.filter(l => l.type === "دخول").length;
+  let x = logs.filter(l => l.exitTime).length;
+  let r = logs.filter(l => l.status === "مرفوض").length;
+  let t = logs.filter(
+    l => l.date === localDateKey() && l.type === "دخول"
+  ).length;
+
+  $("adminTotalEntries").textContent = e;
+  $("adminTotalExits").textContent = x;
+  $("adminTotalRejected").textContent = r;
+  $("adminTodayEntries").textContent = t;
+
+  renderAdminLogs();
+  showInsidePeople();
+  renderAuditLogs();
+}
+
 
 
 
