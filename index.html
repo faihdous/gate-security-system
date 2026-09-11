@@ -1055,12 +1055,7 @@ tbody tr:last-child td{
 <section class="card">
   <h2>سجل تعديلات النظام</h2>
 
-  <div class="actions">
-    <button class="red" onclick="clearAuditLogs()">
-      مسح سجل التعديلات
-    </button>
-  </div>
-
+  
   <div id="auditLogsTable"></div>
 </section>
 
@@ -1245,53 +1240,6 @@ async function addAudit(action, details=""){
   }
 }
 
-async function clearAuditLogs(){
-  const confirmed = confirm(
-    "هل أنت متأكد من مسح سجل تعديلات النظام بالكامل؟\n\n" +
-    "سيتم الاحتفاظ بسجل يوضح أن السجل تم مسحه."
-  );
-
-  if(!confirmed) return;
-
-  // بيانات المستخدم الحالي قبل الحذف
-  const { data: userData } =
-    await supabaseClient.auth.getUser();
-
-  const user = userData.user;
-
-  // حذف سجلات التعديلات القديمة
-  const { error } = await supabaseClient
-    .from("audit_logs")
-    .delete()
-    .not("id", "is", null);
-
-  if(error){
-    console.error("خطأ مسح سجل التعديلات:", error);
-    toast("تعذر مسح سجل التعديلات: " + error.message, false);
-    return;
-  }
-
-  // تسجيل عملية المسح بعد الحذف
-  const { error: auditError } = await supabaseClient
-    .from("audit_logs")
-    .insert({
-      action: "مسح سجل تعديلات النظام",
-      details: "تم مسح جميع سجلات تعديلات النظام",
-      user_id: user?.id || null,
-      username: user?.email || "غير محدد"
-    });
-
-  if(auditError){
-    console.error("تعذر تسجيل عملية المسح:", auditError);
-    toast("تم المسح، لكن تعذر تسجيل العملية", false);
-    await renderAuditLogs();
-    return;
-  }
-
-  await renderAuditLogs();
-
-  toast("تم مسح سجل التعديلات وتسجيل العملية بنجاح");
-}
 
 
 
