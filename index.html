@@ -867,6 +867,72 @@ tbody tr:last-child td{
     max-width:calc(100% - 28px);
   }
 }
+  /* جعل مربعات الإحصائيات قابلة للضغط */
+.clickable-stat{
+  cursor:pointer;
+  user-select:none;
+}
+
+.clickable-stat small{
+  position:relative;
+  z-index:2;
+  display:block;
+  margin-top:8px;
+  color:var(--blue-2);
+  font-size:11px;
+  opacity:.8;
+}
+
+.clickable-stat:hover small{
+  opacity:1;
+}
+
+/* خلفية نافذة التفاصيل */
+.details-modal{
+  position:fixed;
+  inset:0;
+  z-index:100;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(3,20,38,.65);
+  backdrop-filter:blur(6px);
+}
+
+/* صندوق التفاصيل */
+.details-box{
+  width:min(1100px,100%);
+  max-height:85vh;
+  overflow:auto;
+  padding:25px;
+  border-radius:22px;
+  background:#fff;
+  box-shadow:0 25px 80px rgba(0,0,0,.3);
+  animation:cardEnter .3s ease both;
+}
+
+/* عنوان نافذة التفاصيل */
+.details-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  margin-bottom:20px;
+}
+
+.details-header h2{
+  margin:0;
+  color:var(--blue);
+}
+
+/* زر إغلاق نافذة التفاصيل */
+.close-details{
+  min-width:45px;
+  padding:8px 14px;
+  background:linear-gradient(135deg,#971717,#dc3c3c);
+}
+
 </style>
 </head>
 
@@ -1014,11 +1080,33 @@ tbody tr:last-child td{
 
 <main>
 <section class="stats">
-<div class="stat"><span>إجمالي عمليات الدخول</span><strong id="adminTotalEntries">0</strong></div>
-<div class="stat"><span>إجمالي عمليات الخروج</span><strong id="adminTotalExits">0</strong></div>
-<div class="stat"><span>المحاولات المرفوضة</span><strong id="adminTotalRejected">0</strong></div>
-<div class="stat"><span>عمليات دخول اليوم</span><strong id="adminTodayEntries">0</strong></div>
+
+  <div class="stat clickable-stat" onclick="showAdminStatDetails('entries')">
+    <span>إجمالي عمليات الدخول</span>
+    <strong id="adminTotalEntries">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showAdminStatDetails('exits')">
+    <span>إجمالي عمليات الخروج</span>
+    <strong id="adminTotalExits">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showAdminStatDetails('rejected')">
+    <span>المحاولات المرفوضة</span>
+    <strong id="adminTotalRejected">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showAdminStatDetails('today')">
+    <span>عمليات دخول اليوم</span>
+    <strong id="adminTodayEntries">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
 </section>
+
 
 <section class="card">
   <h2>الموجودون داخل المبنى</h2>
@@ -1063,7 +1151,27 @@ tbody tr:last-child td{
 </main>
 </section>
 
+<div id="detailsModal" class="details-modal hidden">
+  <div class="details-box">
+
+    <div class="details-header">
+      <h2 id="detailsTitle">تفاصيل العمليات</h2>
+
+      <button
+        class="close-details"
+        onclick="closeAdminDetails()"
+      >
+        إغلاق
+      </button>
+    </div>
+
+    <div id="detailsContent"></div>
+
+  </div>
+</div>
+
 <div id="toast"></div>
+
 
 <script>
 const SUPABASE_URL =
@@ -1830,6 +1938,115 @@ function renderAdminPage(){
   showInsidePeople();
   renderAuditLogs();
 }
+function showAdminStatDetails(type){
+
+  let title = "";
+  let filteredLogs = [];
+
+  if(type === "entries"){
+    title = "تفاصيل إجمالي عمليات الدخول";
+
+    filteredLogs = logs.filter(function(log){
+      return log.type === "دخول";
+    });
+  }
+
+  if(type === "exits"){
+    title = "تفاصيل إجمالي عمليات الخروج";
+
+    filteredLogs = logs.filter(function(log){
+      return log.exitTime;
+    });
+  }
+
+  if(type === "rejected"){
+    title = "تفاصيل المحاولات المرفوضة";
+
+    filteredLogs = logs.filter(function(log){
+      return log.status === "مرفوض";
+    });
+  }
+
+  if(type === "today"){
+    title = "تفاصيل عمليات دخول اليوم";
+
+    filteredLogs = logs.filter(function(log){
+      return log.date === localDateKey() &&
+             log.type === "دخول";
+    });
+  }
+
+  $("detailsTitle").textContent =
+    title + " (" + filteredLogs.length + ")";
+
+  if(!filteredLogs.length){
+
+    $("detailsContent").innerHTML =
+      `<div class="empty">لا توجد تفاصيل لعرضها</div>`;
+
+    $("detailsModal").classList.remove("hidden");
+    return;
+  }
+
+  $("detailsContent").innerHTML = `
+    <div class="table-wrapper">
+      <table>
+
+        <thead>
+          <tr>
+            <th>التاريخ</th>
+            <th>الاسم</th>
+            <th>الرقم المدني</th>
+            <th>العملية</th>
+            <th>الحالة</th>
+            <th>وقت الدخول</th>
+            <th>مستخدم الدخول</th>
+            <th>وقت الخروج</th>
+            <th>مستخدم الخروج</th>
+            <th>السبب</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${filteredLogs.map(function(log){
+
+            return `
+              <tr>
+                <td>${esc(formatDate(log.date))}</td>
+                <td>${esc(log.name || "-")}</td>
+                <td>${esc(log.civilId || "-")}</td>
+                <td>${esc(log.type || "-")}</td>
+                <td>${esc(log.status || "-")}</td>
+                <td>${esc(log.timeText || "-")}</td>
+                <td>${esc(log.securityUser || "-")}</td>
+                <td>${esc(log.exitTimeText || "لم يسجل خروج")}</td>
+                <td>${esc(log.exitSecurityUser || "-")}</td>
+                <td>${esc(log.reason || "-")}</td>
+              </tr>
+            `;
+
+          }).join("")}
+        </tbody>
+
+      </table>
+    </div>
+  `;
+
+  $("detailsModal").classList.remove("hidden");
+}
+function closeAdminDetails(){
+
+  $("detailsModal").classList.add("hidden");
+
+  $("detailsContent").innerHTML = "";
+}
+$("detailsModal").addEventListener("click", function(event){
+
+  if(event.target === this){
+    closeAdminDetails();
+  }
+
+});
 
 
 
