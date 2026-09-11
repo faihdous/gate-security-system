@@ -1926,14 +1926,7 @@ function showInsidePeople(){
 }
 
 
-async function renderAuditLogs(){
-  const data = await loadAuditLogs();
 
-  if(!data.length){
-    $("auditLogsTable").innerHTML =
-      `<div class="empty">لا توجد تعديلات مسجلة</div>`;
-    return;
-  }
 
 async function renderAuditLogs(){
   const data = await loadAuditLogs();
