@@ -1185,10 +1185,59 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_KEY
 );
 
-const SECURITY_USERS=[
+const LOGIN_USERS = {
+  S1: {
+    uid: "1ca61555-57c4-43d6-8558-6465e41f67c8",
+    role: "security"
+  },
+  S2: {
+    uid: "f3cd2648-9d3f-467d-9b1b-4dbaaa17a1fe",
+    role: "security"
+  },
+  S3: {
+    uid: "a5b2ee04-12a7-4643-8e5b-39cbb7d28a45",
+    role: "security"
+  },
+  S4: {
+    uid: "04183983-591d-4a51-bca9-8ba8909d0ef8",
+    role: "security"
+  },
+  S5: {
+    uid: "7d85b04f-49f6-458d-b9fd-31eeda34c84a",
+    role: "security"
+  },
 
-{username:"علي",code:"1234"},
-{username:"عزيز",code:"5678"}
+  SS: {
+    uid: "1cb1c1cf-b087-47e4-a217-f13fa0b0b430",
+    role: "permits"
+  },
+  OS1: {
+    uid: "187b3809-fe29-45a2-9d5b-8a049e134eb0",
+    role: "permits"
+  },
+  OS2: {
+    uid: "63eadfca-9a3b-4847-a2db-ae01d20c3fb0",
+    role: "permits"
+  },
+
+  MS1: {
+    uid: "6058fb7d-12ea-46c8-9fdf-e4099a2a7883",
+    role: "admin"
+  },
+  MS2: {
+    uid: "5c868b6e-ce96-4c3b-b9dd-e6819b0c13a6",
+    role: "admin"
+  },
+  GM: {
+    uid: "3e93a8b5-5c3e-4b89-a095-3da8050ad01d",
+    role: "admin"
+  },
+  AGM: {
+    uid: "d31f1074-5f6c-4866-ba1b-294fb85fb485",
+    role: "admin"
+  }
+};
+
 ];
 
 const PERMITS_CODE="permit123";
@@ -1334,19 +1383,26 @@ async function addAudit(action, details=""){
   const { data } = await supabaseClient.auth.getUser();
   const user = data.user;
 
+  const savedUsername =
+    currentSecurityUser?.username ||
+    JSON.parse(sessionStorage.getItem("gatePermitsUser") || "null")?.username ||
+    JSON.parse(sessionStorage.getItem("gateAdminUser") || "null")?.username ||
+    "غير محدد";
+
   const { error } = await supabaseClient
     .from("audit_logs")
     .insert({
       action: action,
       details: details,
       user_id: user?.id || null,
-      username: user?.email || "غير محدد"
+      username: savedUsername
     });
 
   if(error){
     console.error("خطأ سجل التعديلات:", error);
   }
 }
+
 
 
 
@@ -1468,90 +1524,16 @@ function selectLoginType(t){
 
   $("loginDescription").textContent =
     t === "security"
-      ? "أدخل البريد الإلكتروني وكلمة المرور لمستخدم الأمن"
+      ? "أدخل اسم المستخدم وكلمة المرور لمستخدم الأمن"
       : t === "permits"
-        ? "أدخل البريد الإلكتروني وكلمة المرور لمسؤول التصاريح"
-        : "أدخل البريد الإلكتروني وكلمة المرور لمسؤول الإدارة";
+        ? "أدخل اسم المستخدم وكلمة المرور لمسؤول التصاريح"
+        : "أدخل اسم المستخدم وكلمة المرور لمسؤول الإدارة";
 
-  $("email").value = "";
+  $("username").value = "";
   $("accessCode").value = "";
   $("loginError").textContent = "";
 }
 
-$("loginForm").addEventListener("submit", async e => {
-  e.preventDefault();
-
-  const email = $("email").value.trim();
-  const password = $("accessCode").value.trim();
-
-  if (!email || !password) {
-    $("loginError").textContent =
-      "أدخل البريد الإلكتروني وكلمة المرور";
-    return;
-  }
-
-  $("loginError").textContent = "جاري تسجيل الدخول...";
-
-  const { data, error } =
-    await supabaseClient.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
-
-  if (error) {
-    console.error(error);
-    $("loginError").textContent =
-      "البريد الإلكتروني أو كلمة المرور غير صحيحة";
-    return;
-  }
-
-  const user = data.user;
-
-  if (loginType === "security") {
-    currentSecurityUser = {
-      id: user.id,
-      username: email
-    };
-
-    sessionStorage.setItem(
-      "gateSecurityUser",
-      JSON.stringify(currentSecurityUser)
-    );
-
-    $("loginPage").classList.add("hidden");
-    $("securityPage").classList.remove("hidden");
-
-    $("securityUserName").textContent =
-      "مستخدم الأمن: " + email;
-
-    refreshSecurity();
-    return;
-  }
-
-  if (loginType === "permits") {
-    sessionStorage.setItem(
-      "gatePermitsLoggedIn",
-      "true"
-    );
-
-    $("loginPage").classList.add("hidden");
-    $("permitsPage").classList.remove("hidden");
-
-    renderPermitsPage();
-    return;
-  }
-
-  if (loginType === "admin") {
-    sessionStorage.setItem(
-      "gateAdminLoggedIn",
-      "true"
-    );
-
-    $("loginPage").classList.add("hidden");
-    $("adminPage").classList.remove("hidden");
-
-    renderAdminPage();
-  }
 });
 
 async function logout(){
@@ -1694,7 +1676,8 @@ async function addLog(x){
     full_name: x.name || currentPerson?.name || "",
     type: x.type || "",
     status: x.status || "",
-    security_user: user.data.user?.email || "غير محدد",
+    security_user:
+  currentSecurityUser?.username || "غير محدد",
     exit_security_user: null,
     entry_time: new Date().toISOString(),
     exit_time: null,
@@ -1765,7 +1748,9 @@ async function exit(){
     .from("gate_logs")
     .update({
       exit_time: exitTime,
-      exit_security_user: user.data.user?.email || "غير محدد"
+      exit_security_user:
+  currentSecurityUser?.username || "غير محدد"
+
     })
     .eq("id", l.id);
 
@@ -1779,7 +1764,8 @@ async function exit(){
     .toLocaleTimeString("ar-KW");
 
   l.exitSecurityUser =
-    user.data.user?.email || "غير محدد";
+  currentSecurityUser?.username || "غير محدد";
+
 
   refreshSecurity();
   toast("تم تسجيل الخروج بنجاح");
@@ -2384,12 +2370,70 @@ ${m}`;
   );
 }
 
-async function initialize(){  
-await loadAllData();
-  
-let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
-(async function(){
-  initialize();
+async function initialize() {
+  await loadAllData();
+
+  const securitySession =
+    sessionStorage.getItem("gateSecurityUser");
+
+  if (securitySession) {
+    currentSecurityUser =
+      JSON.parse(securitySession);
+
+    $("loginPage").classList.add("hidden");
+    $("securityPage").classList.remove("hidden");
+
+    $("securityUserName").textContent =
+      "مستخدم الأمن: " +
+      currentSecurityUser.username;
+
+    refreshSecurity();
+    return;
+  }
+
+  const permitsSession =
+    sessionStorage.getItem("gatePermitsUser");
+
+  if (permitsSession) {
+    const permitsUser =
+      JSON.parse(permitsSession);
+
+    $("loginPage").classList.add("hidden");
+    $("permitsPage").classList.remove("hidden");
+
+    document.querySelector(
+      "#permitsPage .header-left span"
+    ).textContent =
+      "مستخدم التصاريح: " +
+      permitsUser.username;
+
+    renderPermitsPage();
+    return;
+  }
+
+  const adminSession =
+    sessionStorage.getItem("gateAdminUser");
+
+  if (adminSession) {
+    const adminUser =
+      JSON.parse(adminSession);
+
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
+
+    document.querySelector(
+      "#adminPage .header-left span"
+    ).textContent =
+      "مستخدم الإدارة: " +
+      adminUser.username;
+
+    renderAdminPage();
+    return;
+  }
+}
+
+(async function () {
+  await initialize();
 })();
 
 
