@@ -1550,10 +1550,12 @@ $("loginForm").addEventListener("submit", async function(e){
 
   const { data, error } =
     await supabaseClient.functions.invoke("login-by-uid", {
-      body: {
-        username: username,
-        password: password
-      }
+     body: {
+  username: username,
+  password: password,
+  loginType: loginType
+}
+
     });
 
   console.log("Function result:", data, error);
@@ -1570,6 +1572,19 @@ $("loginForm").addEventListener("submit", async function(e){
   });
 
   const sessionUser = data.user;
+if (!sessionUser || !sessionUser.role) {
+  $("loginError").textContent = "تعذر تحديد صلاحية المستخدم";
+  await supabaseClient.auth.signOut();
+  return;
+}
+
+if (sessionUser.role !== loginType) {
+  $("loginError").textContent =
+    "هذا المستخدم غير مصرح له بالدخول من هذه الصفحة";
+
+  await supabaseClient.auth.signOut();
+  return;
+}
 
   if(sessionUser.role === "security"){
     currentSecurityUser = sessionUser;
