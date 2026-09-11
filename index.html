@@ -1560,7 +1560,8 @@ $("loginForm").addEventListener("submit", async function(e){
     return;
   }
 
-  const email = `${username.toLowerCase()}@gate-system.local`;
+  const email = `${username.trim().toLowerCase()}@gate-system.local`;
+
 
   const { error } =
     await supabaseClient.auth.signInWithPassword({
