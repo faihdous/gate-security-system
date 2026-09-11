@@ -1539,53 +1539,39 @@ $("loginForm").addEventListener("submit", async function(e){
   e.preventDefault();
 
   const username = $("username").value.trim().toUpperCase();
-  const password = $("accessCode").value.trim();
-  const user = LOGIN_USERS[username];
+  const password = $("accessCode").value;
 
   $("loginError").textContent = "";
 
-  if(!user){
-    $("loginError").textContent = "اسم المستخدم غير صحيح";
-    return;
-  }
-
-  if(user.role !== loginType){
-    $("loginError").textContent =
-      "اسم المستخدم لا يتبع نوع الدخول المحدد";
-    return;
-  }
-
-  if(!password){
-    $("loginError").textContent = "أدخل كلمة المرور";
+  if(!username || !password){
+    $("loginError").textContent = "أدخل اسم المستخدم وكلمة المرور";
     return;
   }
 
   const { data, error } =
-  await supabaseClient.functions.invoke(
-    "login-by-uid",
-    {
+    await supabaseClient.functions.invoke("login-by-uid", {
       body: {
-        username,
-        password
+        username: username,
+        password: password
       }
-    }
-  );
+    });
 
+  console.log("Function result:", data, error);
 
-  if(error){
-    console.error(error);
+  if(error || !data?.session){
     $("loginError").textContent =
-      "اسم المستخدم أو كلمة المرور غير صحيحة";
+      data?.error || "اسم المستخدم أو كلمة المرور غير صحيحة";
     return;
   }
 
-  const sessionUser = {
-    username,
-    uid: user.uid,
-    role: user.role
-  };
+  await supabaseClient.auth.setSession({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token
+  });
 
-  if(user.role === "security"){
+  const sessionUser = data.user;
+
+  if(sessionUser.role === "security"){
     currentSecurityUser = sessionUser;
 
     sessionStorage.setItem(
@@ -1596,12 +1582,12 @@ $("loginForm").addEventListener("submit", async function(e){
     $("loginPage").classList.add("hidden");
     $("securityPage").classList.remove("hidden");
     $("securityUserName").textContent =
-      "مستخدم الأمن: " + username;
+      "مستخدم الأمن: " + sessionUser.username;
 
     refreshSecurity();
   }
 
-  if(user.role === "permits"){
+  if(sessionUser.role === "permits"){
     sessionStorage.setItem(
       "gatePermitsUser",
       JSON.stringify(sessionUser)
@@ -1613,12 +1599,12 @@ $("loginForm").addEventListener("submit", async function(e){
     document.querySelector(
       "#permitsPage .header-left span"
     ).textContent =
-      "مستخدم التصاريح: " + username;
+      "مستخدم التصاريح: " + sessionUser.username;
 
     renderPermitsPage();
   }
 
-  if(user.role === "admin"){
+  if(sessionUser.role === "admin"){
     sessionStorage.setItem(
       "gateAdminUser",
       JSON.stringify(sessionUser)
@@ -1630,7 +1616,7 @@ $("loginForm").addEventListener("submit", async function(e){
     document.querySelector(
       "#adminPage .header-left span"
     ).textContent =
-      "مستخدم الإدارة: " + username;
+      "مستخدم الإدارة: " + sessionUser.username;
 
     renderAdminPage();
   }
