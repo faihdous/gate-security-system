@@ -971,13 +971,14 @@ tbody tr:last-child td{
 
 
 <form id="loginForm">
-<label>البريد الإلكتروني</label>
+<label>اسم المستخدم</label>
 <input
-  id="email"
-  type="email"
-  placeholder="أدخل البريد الإلكتروني"
+  id="username"
+  type="text"
+  placeholder="أدخل اسم المستخدم"
   required
 >
+
 
 <label>كلمة المرور</label>
 <input
@@ -1237,6 +1238,7 @@ const LOGIN_USERS = {
     role: "admin"
   }
 };
+
 
 
 
@@ -1528,19 +1530,116 @@ function selectLoginType(t){
         ? "أدخل اسم المستخدم وكلمة المرور لمسؤول التصاريح"
         : "أدخل اسم المستخدم وكلمة المرور لمسؤول الإدارة";
 
-  $("username").value = "";
+   $("username").value = "";
   $("accessCode").value = "";
   $("loginError").textContent = "";
 }
 
+$("loginForm").addEventListener("submit", async function(e){
+  e.preventDefault();
+
+  const username = $("username").value.trim().toUpperCase();
+  const password = $("accessCode").value.trim();
+  const user = LOGIN_USERS[username];
+
+  $("loginError").textContent = "";
+
+  if(!user){
+    $("loginError").textContent = "اسم المستخدم غير صحيح";
+    return;
+  }
+
+  if(user.role !== loginType){
+    $("loginError").textContent =
+      "اسم المستخدم لا يتبع نوع الدخول المحدد";
+    return;
+  }
+
+  if(!password){
+    $("loginError").textContent = "أدخل كلمة المرور";
+    return;
+  }
+
+  const email = `${username.toLowerCase()}@gate-system.local`;
+
+  const { error } =
+    await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+  if(error){
+    console.error(error);
+    $("loginError").textContent =
+      "اسم المستخدم أو كلمة المرور غير صحيحة";
+    return;
+  }
+
+  const sessionUser = {
+    username,
+    uid: user.uid,
+    role: user.role
+  };
+
+  if(user.role === "security"){
+    currentSecurityUser = sessionUser;
+
+    sessionStorage.setItem(
+      "gateSecurityUser",
+      JSON.stringify(sessionUser)
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("securityPage").classList.remove("hidden");
+    $("securityUserName").textContent =
+      "مستخدم الأمن: " + username;
+
+    refreshSecurity();
+  }
+
+  if(user.role === "permits"){
+    sessionStorage.setItem(
+      "gatePermitsUser",
+      JSON.stringify(sessionUser)
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("permitsPage").classList.remove("hidden");
+
+    document.querySelector(
+      "#permitsPage .header-left span"
+    ).textContent =
+      "مستخدم التصاريح: " + username;
+
+    renderPermitsPage();
+  }
+
+  if(user.role === "admin"){
+    sessionStorage.setItem(
+      "gateAdminUser",
+      JSON.stringify(sessionUser)
+    );
+
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
+
+    document.querySelector(
+      "#adminPage .header-left span"
+    ).textContent =
+      "مستخدم الإدارة: " + username;
+
+    renderAdminPage();
+  }
 });
+
 
 async function logout(){
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
-  sessionStorage.removeItem("gatePermitsLoggedIn");
-  sessionStorage.removeItem("gateAdminLoggedIn");
+  sessionStorage.removeItem("gatePermitsUser");
+sessionStorage.removeItem("gateAdminUser");
+
 
   currentSecurityUser = null;
 
@@ -1554,8 +1653,9 @@ async function permitsLogout(){
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
-  sessionStorage.removeItem("gatePermitsLoggedIn");
-  sessionStorage.removeItem("gateAdminLoggedIn");
+  sessionStorage.removeItem("gatePermitsUser");
+sessionStorage.removeItem("gateAdminUser");
+
 
   $("permitsPage").classList.add("hidden");
   $("loginPage").classList.remove("hidden");
@@ -1567,8 +1667,9 @@ async function adminLogout(){
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
-  sessionStorage.removeItem("gatePermitsLoggedIn");
-  sessionStorage.removeItem("gateAdminLoggedIn");
+  sessionStorage.removeItem("gatePermitsUser");
+sessionStorage.removeItem("gateAdminUser");
+
 
   $("adminPage").classList.add("hidden");
   $("loginPage").classList.remove("hidden");
