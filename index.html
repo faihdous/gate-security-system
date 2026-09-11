@@ -1910,6 +1910,31 @@ function showInsidePeople(){
     </div>
   `;
 }
+
+  async function loadAuditLogs(){
+  const { data, error } = await supabaseClient
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if(error){
+    console.error("خطأ تحميل سجل التعديلات:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+
+async function renderAuditLogs(){
+  const data = await loadAuditLogs();
+
+  if(!data.length){
+    $("auditLogsTable").innerHTML =
+      `<div class="empty">لا توجد تعديلات مسجلة</div>`;
+    return;
+  }
+
 async function renderAuditLogs(){
   const data = await loadAuditLogs();
 
