@@ -2068,7 +2068,9 @@ ${m}`;
   );
 }
 
-async function initialize(){  await loadAllData();
+async function initialize(){  
+await loadAllData();
+  
 let u=sessionStorage.getItem("gateSecurityUser");if(u){currentSecurityUser=JSON.parse(u);$("loginPage").classList.add("hidden");$("securityPage").classList.remove("hidden");$("securityUserName").textContent="مستخدم الأمن: "+currentSecurityUser.username;refreshSecurity();return}if(sessionStorage.getItem("gatePermitsLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("permitsPage").classList.remove("hidden");renderPermitsPage();return}if(sessionStorage.getItem("gateAdminLoggedIn")==="true"){$("loginPage").classList.add("hidden");$("adminPage").classList.remove("hidden");renderAdminPage()}}
 (async function(){
   initialize();
