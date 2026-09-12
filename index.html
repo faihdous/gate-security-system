@@ -932,7 +932,18 @@ tbody tr:last-child td{
   padding:8px 14px;
   background:linear-gradient(135deg,#971717,#dc3c3c);
 }
+#adminLogsTable{
+  max-height:1200px;
+  overflow-y:auto;
+  overflow-x:auto;
+  border-radius:15px;
+}
 
+#adminLogsTable .table-wrapper{
+  overflow:visible;
+}
+
+  
 </style>
 </head>
 
@@ -1121,7 +1132,7 @@ tbody tr:last-child td{
 
 
 <section class="card">
-<h2>تفاصيل عمليات الدخول والخروج</h2>
+<h2>تفاصيل عمليات اليوم</h2>
 <div class="search-row">
   <input
     id="adminLogSearch"
@@ -2311,18 +2322,20 @@ function renderAdminLogs(){
   let q = $("adminLogSearch").value.toLowerCase().trim();
 
   let a = logs.filter(l => {
-    let text = [
-      l.name,
-      l.civilId,
-      l.securityUser,
-      l.exitSecurityUser,
-      l.type,
-      l.status,
-      l.reason
-    ].join(" ").toLowerCase();
+  if(l.date !== localDateKey()) return false;
 
-    return !q || text.includes(q);
-  });
+  let text = [
+    l.name,
+    l.civilId,
+    l.securityUser,
+    l.exitSecurityUser,
+    l.type,
+    l.status,
+    l.reason
+  ].join(" ").toLowerCase();
+
+  return !q || text.includes(q);
+});
 
   if(!a.length){
     $("adminLogsTable").innerHTML =
