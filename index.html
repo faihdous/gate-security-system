@@ -2467,11 +2467,9 @@ function renderAdminLogs(){
               }
             </td>
             <td>
-              ${l.type === "دخول"
-                ? esc(l.securityUser || "-")
-                : "-"
-              }
-            </td>
+  ${esc(l.securityUser || "-")}
+</td>
+
             <td>${esc(l.exitTimeText || "لم يسجل خروج")}</td>
             <td>${esc(l.exitSecurityUser || "-")}</td>
             <td>${esc(l.reason || "-")}</td>
