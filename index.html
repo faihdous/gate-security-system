@@ -2168,7 +2168,12 @@ function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsLi
 function renderAdminPage(){
   let e = logs.filter(l => l.type === "دخول").length;
   let x = logs.filter(l => l.exitTime).length;
-  let r = logs.filter(l => l.status === "مرفوض").length;
+  let r = logs.filter(l =>
+  ["مرفوض", "rejected", "رفض"].includes(
+    String(l.status || "").trim().toLowerCase()
+  )
+).length;
+
   let t = logs.filter(
     l => l.date === localDateKey() && l.type === "دخول"
   ).length;
@@ -2206,9 +2211,12 @@ function showAdminStatDetails(type){
   if(type === "rejected"){
     title = "تفاصيل المحاولات المرفوضة";
 
-    filteredLogs = logs.filter(function(log){
-      return log.status === "مرفوض";
-    });
+   filteredLogs = logs.filter(function(log){
+  return ["مرفوض", "rejected", "رفض"].includes(
+    String(log.status || "").trim().toLowerCase()
+  );
+});
+
   }
 
   if(type === "today"){
