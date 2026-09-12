@@ -1391,33 +1391,7 @@ async function loadAllData(){
   ]);
 }
 
-async function addAudit(action, details=""){
-  const { data } = await supabaseClient.auth.getUser();
-  const user = data.user;
-
-  const savedUsername =
-    currentSecurityUser?.username ||
-    JSON.parse(sessionStorage.getItem("gatePermitsUser") || "null")?.username ||
-    JSON.parse(sessionStorage.getItem("gateAdminUser") || "null")?.username ||
-    "غير محدد";
-
-  const { error } = await supabaseClient
-    .from("audit_logs")
-    .insert({
-      action: action,
-      details: details,
-      user_id: user?.id || null,
-      username: savedUsername
-    });
-
-  if(error){
-    console.error("خطأ سجل التعديلات:", error);
-  }
-}
-
-
-
-
+async function addAudit(action, details = "") {
 
 
 async function deleteIndividualLog(logId){
@@ -1453,9 +1427,10 @@ async function deleteIndividualLog(logId){
     l => String(l.id) !== String(logId)
   );
 await addAudit(
-  "حذف تقرير",
-  `تم حذف تقرير الرقم المدني: ${log.civilId} والاسم: ${log.name}`
+  "حذف تصريح",
+  `تم حذف/إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
 );
+
 
   // تحديث الصفحة الإدارية
   if(!$("adminPage").classList.contains("hidden")){
@@ -2092,8 +2067,9 @@ if(error){
 
 await addAudit(
   "تعديل تصريح",
-  `تم تعديل تصريح الرقم المدني من ${old} إلى ${p.civilId}`
+  `تم تعديل تصريح الرقم المدني من ${old} إلى ${p.civilId} والاسم: ${p.name}`
 );
+
 editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
 function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
