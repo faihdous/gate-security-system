@@ -1392,12 +1392,66 @@ async function loadAllData(){
 }
 
 async function addAudit(action, details = "") {
+  try {
+    const { data: authData, error: authError } =
+      await supabaseClient.auth.getUser();
+
+    if (authError) {
+      console.error("خطأ جلب المستخدم:", authError);
+    }
+
+    const user = authData?.user;
+
+    const securityUser =
+      currentSecurityUser?.username || "";
+
+    const permitsUser =
+      JSON.parse(
+        sessionStorage.getItem("gatePermitsUser") || "null"
+      )?.username || "";
+
+    const adminUser =
+      JSON.parse(
+        sessionStorage.getItem("gateAdminUser") || "null"
+      )?.username || "";
+
+    const username =
+      securityUser ||
+      permitsUser ||
+      adminUser ||
+      user?.email ||
+      "غير محدد";
+
+    const { error } = await supabaseClient
+      .from("audit_logs")
+      .insert({
+        action: action,
+        details: details,
+        user_id: user?.id || null,
+        username: username
+      });
+
+    if (error) {
+      console.error("خطأ حفظ سجل التعديلات:", error);
+      toast("تعذر حفظ سجل التعديلات", false);
+      return false;
+    }
+
+    return true;
+
+  } catch (error) {
+    console.error("خطأ غير متوقع في سجل التعديلات:", error);
+    return false;
+  }
+}
 
 
-async function deleteIndividualLog(logId){
-  const log = logs.find(l => String(l.id) === String(logId));
+async function deleteIndividualLog(logId) {
+  const log = logs.find(
+    l => String(l.id) === String(logId)
+  );
 
-  if(!log){
+  if (!log) {
     toast("السجل غير موجود", false);
     return;
   }
@@ -1409,41 +1463,39 @@ async function deleteIndividualLog(logId){
     "سيتم حذف سجل الدخول والخروج المرتبط بهذا الشخص."
   );
 
-  if(!confirmed) return;
+  if (!confirmed) return;
 
   const { error } = await supabaseClient
     .from("gate_logs")
     .delete()
     .eq("id", logId);
 
-  if(error){
+  if (error) {
     console.error(error);
     toast("تعذر حذف السجل: " + error.message, false);
     return;
   }
 
-  // حذف السجل من القائمة الموجودة داخل المتصفح
   logs = logs.filter(
     l => String(l.id) !== String(logId)
   );
-await addAudit(
-  "حذف تصريح",
-  `تم حذف/إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
-);
 
+  await addAudit(
+    "حذف تقرير",
+    `تم حذف تقرير الرقم المدني: ${log.civilId || "-"} والاسم: ${log.name || "-"}`
+  );
 
-  // تحديث الصفحة الإدارية
-  if(!$("adminPage").classList.contains("hidden")){
+  if (!$("adminPage").classList.contains("hidden")) {
     renderAdminPage();
   }
 
-  // تحديث صفحة الأمن إذا كانت مفتوحة
-  if(!$("securityPage").classList.contains("hidden")){
+  if (!$("securityPage").classList.contains("hidden")) {
     refreshSecurity();
   }
 
   toast("تم حذف سجل الشخص بنجاح");
 }
+
 async function clearAllReports(){
   if(!logs.length){
     toast("لا توجد تقارير لمسحها", false);
