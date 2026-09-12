@@ -943,6 +943,41 @@ tbody tr:last-child td{
   overflow:visible;
 }
 
+  .admin-actions{
+  display:grid;
+  grid-template-columns:1fr 180px 180px;
+  gap:12px;
+  align-items:center;
+  margin-bottom:14px;
+}
+
+.admin-actions input{
+  min-height:52px;
+}
+
+.admin-actions button{
+  min-height:52px;
+  font-weight:bold;
+}
+
+.search-admin-btn{
+  background:linear-gradient(135deg,#087b42,#13b965);
+}
+
+.export-admin-btn{
+  background:linear-gradient(135deg,#a96900,#edae1b);
+}
+
+.clear-admin-btn{
+  background:linear-gradient(135deg,#971717,#dc3c3c);
+}
+
+@media(max-width:700px){
+  .admin-actions{
+    grid-template-columns:1fr;
+  }
+}
+
   
 </style>
 </head>
@@ -1133,21 +1168,37 @@ tbody tr:last-child td{
 
 <section class="card">
 <h2>تفاصيل عمليات اليوم</h2>
-<div class="search-row">
+<div class="admin-actions">
+
   <input
     id="adminLogSearch"
     placeholder="ابحث بالرقم المدني أو الاسم أو المستخدم"
-    oninput="renderAdminLogs()"
+    onkeydown="if(event.key === 'Enter') searchAdminLogs()"
   >
 
-  <button class="orange" onclick="exportSecurityLogs()">
+  <button
+    type="button"
+    class="search-admin-btn"
+    onclick="searchAdminLogs()">
+    بحث
+  </button>
+
+  <button
+    type="button"
+    class="export-admin-btn"
+    onclick="exportSecurityLogs()">
     تصدير Excel
   </button>
 
-  <button class="red" onclick="clearAllReports()">
+  <button
+    type="button"
+    class="clear-admin-btn"
+    onclick="clearAllReports()">
     مسح كل التقارير
   </button>
+
 </div>
+
 
 <div id="adminLogsTable"></div>
 </section>
@@ -1393,17 +1444,15 @@ async function loadAllData(){
 
 async function addAudit(action, details = "") {
   try {
-    const { data: authData, error: authError } =
+    const { data: authData } =
       await supabaseClient.auth.getUser();
-
-    if (authError) {
-      console.error("خطأ جلب المستخدم:", authError);
-    }
 
     const user = authData?.user;
 
     const securityUser =
-      currentSecurityUser?.username || "";
+      JSON.parse(
+        sessionStorage.getItem("gateSecurityUser") || "null"
+      )?.username || "";
 
     const permitsUser =
       JSON.parse(
@@ -1431,46 +1480,44 @@ async function addAudit(action, details = "") {
         username: username
       });
 
-    if (error) {
-      console.error("خطأ حفظ سجل التعديلات:", error);
-      toast("تعذر حفظ سجل التعديلات", false);
+    if(error){
+      console.error("خطأ سجل التعديلات:", error);
       return false;
     }
 
     return true;
 
-  } catch (error) {
-    console.error("خطأ غير متوقع في سجل التعديلات:", error);
+  }catch(error){
+    console.error("خطأ غير متوقع:", error);
     return false;
   }
 }
 
 
-async function deleteIndividualLog(logId) {
+async function deleteIndividualLog(logId){
   const log = logs.find(
     l => String(l.id) === String(logId)
   );
 
-  if (!log) {
+  if(!log){
     toast("السجل غير موجود", false);
     return;
   }
 
-  const confirmed = confirm(
+  if(!confirm(
     "هل تريد حذف سجل هذا الشخص؟\n\n" +
     "الاسم: " + (log.name || "-") + "\n" +
-    "الرقم المدني: " + (log.civilId || "-") + "\n\n" +
-    "سيتم حذف سجل الدخول والخروج المرتبط بهذا الشخص."
-  );
-
-  if (!confirmed) return;
+    "الرقم المدني: " + (log.civilId || "-")
+  )){
+    return;
+  }
 
   const { error } = await supabaseClient
     .from("gate_logs")
     .delete()
     .eq("id", logId);
 
-  if (error) {
+  if(error){
     console.error(error);
     toast("تعذر حذف السجل: " + error.message, false);
     return;
@@ -1485,14 +1532,7 @@ async function deleteIndividualLog(logId) {
     `تم حذف تقرير الرقم المدني: ${log.civilId || "-"} والاسم: ${log.name || "-"}`
   );
 
-  if (!$("adminPage").classList.contains("hidden")) {
-    renderAdminPage();
-  }
-
-  if (!$("securityPage").classList.contains("hidden")) {
-    refreshSecurity();
-  }
-
+  renderAdminPage();
   toast("تم حذف سجل الشخص بنجاح");
 }
 
@@ -2346,8 +2386,25 @@ async function renderAuditLogs(){
   `;
 }
 
+  function searchAdminLogs(){
+  renderAdminLogs();
+
+  const value = $("adminLogSearch").value.trim();
+
+  if(value){
+    $("adminLogsTable").scrollIntoView({
+      behavior:"smooth",
+      block:"start"
+    });
+  }
+}
+
+  
 function renderAdminLogs(){
-  let q = $("adminLogSearch").value.toLowerCase().trim();
+  let q = $("adminLogSearch").value
+  .toLowerCase()
+  .trim();
+
 
   let a = logs.filter(l => {
   if(l.date !== localDateKey()) return false;
