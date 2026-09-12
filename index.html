@@ -2445,7 +2445,7 @@ function renderAdminLogs(){
           <th>الرقم المدني</th>
           <th>العملية</th>
           <th>الحالة</th>
-          <th>وقت الدخول</th>
+          <th>وقت العملية</th>
           <th>مستخدم الدخول</th>
           <th>وقت الخروج</th>
           <th>مستخدم الخروج</th>
@@ -2461,11 +2461,9 @@ function renderAdminLogs(){
             <td>${esc(l.type)}</td>
             <td>${esc(l.status)}</td>
             <td>
-              ${l.type === "دخول"
-                ? esc(l.timeText || "-")
-                : "-"
-              }
-            </td>
+  ${esc(l.timeText || "-")}
+</td>
+
             <td>
   ${esc(l.securityUser || "-")}
 </td>
