@@ -1764,9 +1764,10 @@ function renderPerson(p){
           تسجيل خروج
         </button>
 
-        <button class="red" onclick="reject()">
-          رفض الدخول
-        </button>
+        <button class="red" ${open ? "disabled" : ""} onclick="reject()">
+  رفض الدخول
+</button>
+
             </div>
     </div>
   `;
