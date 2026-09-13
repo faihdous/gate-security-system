@@ -933,11 +933,11 @@ tbody tr:last-child td{
   background:linear-gradient(135deg,#971717,#dc3c3c);
 }
 #adminLogsTable{
-  max-height:1200px;
+  max-height:600px;
   overflow-y:auto;
   overflow-x:auto;
-  border-radius:15px;
 }
+
 
 #adminLogsTable .table-wrapper{
   overflow:visible;
@@ -2429,6 +2429,7 @@ function renderAdminLogs(){
 
   return !q || text.includes(q);
 });
+
 
   if(!a.length){
     $("adminLogsTable").innerHTML =
