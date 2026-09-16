@@ -1253,9 +1253,20 @@ tbody tr:last-child td{
 </section>
 
 <section class="card">
-<h2>التصاريح الحالية</h2>
-<div id="permitsList"></div>
+  <h2>التصاريح الحالية</h2>
+
+  <div class="actions">
+    <button
+      type="button"
+      class="green"
+      onclick="downloadAllQR()">
+      حفظ الكل
+    </button>
+  </div>
+
+  <div id="permitsList"></div>
 </section>
+
 </main>
 </section>
 
@@ -2753,6 +2764,42 @@ function downloadPersonQR(personId){
 
   }, 400);
 }
+  async function downloadAllQR(){
+
+  const activePeople = people.filter(person =>
+    status(person).allowed
+  );
+
+  if(!activePeople.length){
+    toast("لا توجد تصاريح فعالة لحفظ QR", false);
+    return;
+  }
+
+  const confirmed = confirm(
+    `سيتم حفظ ${activePeople.length} صور QR.\n\nهل تريد المتابعة؟`
+  );
+
+  if(!confirmed){
+    return;
+  }
+
+  toast("جاري حفظ صور QR، يرجى الانتظار...");
+
+  for(const person of activePeople){
+
+    downloadPersonQR(person.id);
+
+    // تأخير بسيط بين كل تحميل حتى لا يمنع المتصفح الملفات
+    await new Promise(resolve =>
+      setTimeout(resolve, 700)
+    );
+  }
+
+  setTimeout(() => {
+    toast(`تم إرسال ${activePeople.length} صور QR للحفظ`);
+  }, 500);
+}
+
 function saveQRImage(canvas, personName){
 
   const safeName = String(personName || "العامل")
