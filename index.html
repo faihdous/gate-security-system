@@ -2684,18 +2684,21 @@ function downloadPersonQR(personId){
   setTimeout(() => {
 
     const qrCanvas = qrContainer.querySelector("canvas");
-    const qrImage = qrContainer.querySelector("img");
 
-    const qrWidth = 320;
-    const qrHeight = 320;
-    const padding = 35;
-    const titleHeight = 70;
+    if(!qrCanvas){
+      toast("تعذر إنشاء رمز QR", false);
+      return;
+    }
+
+    const qrSize = 320;
+    const padding = 25;
+    const headerHeight = 190;
 
     const finalCanvas = document.createElement("canvas");
 
-    finalCanvas.width = qrWidth + padding * 2;
+    finalCanvas.width = qrSize + padding * 2;
     finalCanvas.height =
-  195 + qrHeight + padding * 2;
+      headerHeight + qrSize + padding * 2;
 
     const ctx = finalCanvas.getContext("2d");
 
@@ -2708,105 +2711,67 @@ function downloadPersonQR(personId){
       finalCanvas.height
     );
 
-   const logo = new Image();
+    const logo = new Image();
 
-logo.onload = function(){
+    logo.onload = function(){
 
-  const logoSize = 90;
-  const logoX = finalCanvas.width / 2 - logoSize / 2;
+      const logoSize = 85;
+      const logoX =
+        (finalCanvas.width - logoSize) / 2;
 
-  // الشعار
-  ctx.drawImage(
-    logo,
-    logoX,
-    15,
-    logoSize,
-    logoSize
-  );
+      // الشعار
+      ctx.drawImage(
+        logo,
+        logoX,
+        10,
+        logoSize,
+        logoSize
+      );
 
-  // اسم الإدارة
-  ctx.fillStyle = "#000000";
-  ctx.font = "bold 22px Tahoma, Arial, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
 
-  ctx.fillText(
-    "الإدارة العامة للجنسية ووثائق السفر الكويتية",
-    finalCanvas.width / 2,
-    125
-  );
+      // اسم الإدارة
+      ctx.font = "bold 19px Tahoma, Arial, sans-serif";
 
-  // اسم العامل
-  ctx.font = "bold 26px Tahoma, Arial, sans-serif";
+      ctx.fillText(
+        "الإدارة العامة للجنسية ووثائق السفر الكويتية",
+        finalCanvas.width / 2,
+        115
+      );
 
-  ctx.fillText(
-    person.name || "بدون اسم",
-    finalCanvas.width / 2,
-    165
-  );
+      // اسم العامل
+      ctx.font = "bold 24px Tahoma, Arial, sans-serif";
 
-  // رمز QR
-  ctx.drawImage(
-    qrCanvas,
-    padding,
-    195,
-    qrWidth,
-    qrHeight
-  );
+      ctx.fillText(
+        person.name || "بدون اسم",
+        finalCanvas.width / 2,
+        155
+      );
 
-  saveQRImage(
-    finalCanvas,
-    person.name
-  );
-};
-
-logo.src = "logo.png";
-
-
-    // إضافة QR إلى الصورة النهائية
-    if(qrCanvas){
-
+      // QR مرة واحدة فقط
       ctx.drawImage(
         qrCanvas,
         padding,
-        titleHeight
+        headerHeight
       );
 
-    }else if(qrImage){
+      saveQRImage(
+        finalCanvas,
+        person.name
+      );
+    };
 
-      const image = new Image();
+    logo.onerror = function(){
+      toast("تعذر تحميل الشعار", false);
+    };
 
-      image.onload = function(){
+    logo.src = "logo.png";
 
-        ctx.drawImage(
-          image,
-          padding,
-          titleHeight,
-          qrWidth,
-          qrHeight
-        );
-
-        saveQRImage(
-          finalCanvas,
-          person.name
-        );
-      };
-
-      image.src = qrImage.src;
-      return;
-
-    }else{
-      toast("تعذر إنشاء رمز QR", false);
-      return;
-    }
-
-    saveQRImage(
-      finalCanvas,
-      person.name
-    );
-
-  }, 400);
+  }, 500);
 }
+
   async function downloadAllQR(){
 
   const activePeople = people.filter(person =>
