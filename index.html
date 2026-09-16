@@ -2574,7 +2574,7 @@ function renderPermitsList(){
                 <tr>
                   <td>${esc(p.name)}</td>
 
-                  <td>${esc(maskCivilId(p.civilId))}</td>
+                  <td>${esc(p.civilId || "-")}</td>
 
                   <td>${esc(p.company || "-")}</td>
 
