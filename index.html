@@ -2669,6 +2669,11 @@ function downloadPersonQR(personId){
     return;
   }
 
+  const qrSize = 320;
+  const canvasWidth = 500;
+  const padding = 25;
+  const headerHeight = 225;
+
   const qrContainer = document.createElement("div");
 
   new QRCode(qrContainer, {
@@ -2676,8 +2681,8 @@ function downloadPersonQR(personId){
       type: "gate_person",
       civilId: person.civilId
     }),
-    width: 320,
-    height: 320,
+    width: qrSize,
+    height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
   });
 
@@ -2690,13 +2695,9 @@ function downloadPersonQR(personId){
       return;
     }
 
-    const qrSize = 320;
-    const padding = 25;
-    const headerHeight = 190;
-
     const finalCanvas = document.createElement("canvas");
 
-    finalCanvas.width = qrSize + padding * 2;
+    finalCanvas.width = canvasWidth;
     finalCanvas.height =
       headerHeight + qrSize + padding * 2;
 
@@ -2715,11 +2716,11 @@ function downloadPersonQR(personId){
 
     logo.onload = function(){
 
+      // الشعار
       const logoSize = 85;
       const logoX =
-        (finalCanvas.width - logoSize) / 2;
+        (canvasWidth - logoSize) / 2;
 
-      // الشعار
       ctx.drawImage(
         logo,
         logoX,
@@ -2732,13 +2733,22 @@ function downloadPersonQR(personId){
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      // اسم الإدارة
+      /*
+       * اسم الإدارة على سطرين
+       * حتى لا يتم قصه من الجانبين
+       */
       ctx.font = "bold 19px Tahoma, Arial, sans-serif";
 
       ctx.fillText(
-        "الإدارة العامة للجنسية ووثائق السفر الكويتية",
-        finalCanvas.width / 2,
-        115
+        "الإدارة العامة للجنسية",
+        canvasWidth / 2,
+        120
+      );
+
+      ctx.fillText(
+        "ووثائق السفر الكويتية",
+        canvasWidth / 2,
+        145
       );
 
       // اسم العامل
@@ -2746,14 +2756,17 @@ function downloadPersonQR(personId){
 
       ctx.fillText(
         person.name || "بدون اسم",
-        finalCanvas.width / 2,
-        155
+        canvasWidth / 2,
+        185
       );
 
-      // QR مرة واحدة فقط
+      // رمز QR في المنتصف
+      const qrX =
+        (canvasWidth - qrSize) / 2;
+
       ctx.drawImage(
         qrCanvas,
-        padding,
+        qrX,
         headerHeight
       );
 
