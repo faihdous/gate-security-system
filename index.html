@@ -2791,76 +2791,116 @@ function downloadPersonQR(personId){
 
   }, 500);
 }
-async function sharePersonQRWithWhatsApp(personId) {
-  const person = people.find(p => String(p.id) === String(personId));
+async function sharePersonQRWithWhatsApp(personId){
 
-  if (!person) {
+  const person = people.find(p => String(p.id) === String(personId));
+  if(!person){
     toast("لم يتم العثور على التصريح", false);
     return;
   }
 
-  // دعم المشاركة
-if (!navigator.share) {
-  toast("مشاركة غير مدعومة على هذا المتصفح", false);
-  return;
-}
+  if(!navigator.share){
+    toast("مشاركة غير مدعومة على هذا المتصفح", false);
+    return;
+  }
 
+  const qrSize = 320;
+  const canvasWidth = 500;
+  const padding = 25;
+  const headerHeight = 225;
 
-  // نفذ QR على عنصر مؤقت
-  const tmp = document.createElement("div");
-  tmp.style.position = "fixed";
-  tmp.style.left = "-9999px";
-  tmp.style.top = "0";
-  document.body.appendChild(tmp);
+  // نحتاج QR canvas جاهز
+  const qrContainer = document.createElement("div");
 
-  tmp.innerHTML = `<div id="tmpQr"></div>`;
-
-  new QRCode(tmp.querySelector("#tmpQr"), {
+  new QRCode(qrContainer, {
     text: JSON.stringify({
       type: "gate_person",
       civilId: person.civilId
     }),
-    width: 520,
-    height: 520,
+    width: qrSize,
+    height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  // انتظر ظهور canvas
-  const canvas = await new Promise((resolve) => {
-    const t = setInterval(() => {
-      const c = tmp.querySelector("canvas");
-      if (c) {
-        clearInterval(t);
-        resolve(c);
-      }
-    }, 50);
+  // انتظر ظهور QR canvas داخل qrContainer
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const qrCanvas = qrContainer.querySelector("canvas");
+  if(!qrCanvas){
+    toast("تعذر إنشاء رمز QR", false);
+    return;
+  }
+
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = canvasWidth;
+  finalCanvas.height = headerHeight + qrSize + padding * 2;
+
+  const ctx = finalCanvas.getContext("2d");
+
+  // خلفية بيضاء
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+  // الشعار + النصوص + QR (نفس سيناريو downloadPersonQR بالضبط)
+  const logo = new Image();
+
+  await new Promise((resolve, reject) => {
+    logo.onload = () => resolve();
+    logo.onerror = () => reject();
+    logo.src = "logo.png";
+  }).catch(() => {
+    toast("تعذر تحميل الشعار", false);
+    return;
   });
 
-  canvas.toBlob(async (blob) => {
-    try {
-      if (!blob) throw new Error("Blob QR غير متاح");
+  // الشعار
+  const logoSize = 85;
+  const logoX = (canvasWidth - logoSize) / 2;
 
-      const safeName = String(person.name || "QR")
-        .replace(/[\\/:*?"<>|]/g, "_")
-        .trim();
+  ctx.drawImage(logo, logoX, 10, logoSize, logoSize);
 
-      const file = new File([blob], `QR_${safeName}.png`, { type: "image/png" });
+  ctx.fillStyle = "#000000";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
 
-      await navigator.share({
-        files: [file],
-        title: "QR تصريح",
-        text: `QR تصريح - ${person.name || ""}`.trim()
-      });
+  ctx.font = "bold 19px Tahoma, Arial, sans-serif";
+  ctx.fillText("الإدارة العامة للجنسية", canvasWidth / 2, 120);
+  ctx.fillText("ووثائق السفر الكويتية", canvasWidth / 2, 145);
 
-      toast("تم تجهيز مشاركة QR (اختَر واتساب)", true);
-    } catch (e) {
-      console.error(e);
-      toast("تعذر إرسال QR كصورة", false);
-    } finally {
-      tmp.remove();
-    }
-  }, "image/png");
+  ctx.font = "bold 24px Tahoma, Arial, sans-serif";
+  ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
+
+  // QR في المنتصف
+  const qrX = (canvasWidth - qrSize) / 2;
+  ctx.drawImage(qrCanvas, qrX, headerHeight);
+
+  // حول finalCanvas إلى blob ثم File وارسله واتساب
+  const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, "image/png"));
+  if(!blob){
+    toast("تعذر تجهيز صورة QR", false);
+    return;
+  }
+
+  const safeName = String(person.name || "QR")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
+
+  const file = new File([blob], `QR_${safeName}.png`, { type: "image/png" });
+
+  try{
+    await navigator.share({
+      files: [file],
+      title: "QR تصريح",
+      text: `QR تصريح - ${person.name || ""}`.trim()
+    });
+
+    toast("تم إرسال صورة QR عبر واتساب", true);
+  }catch(e){
+    console.error(e);
+    toast("تم الإلغاء أو تعذر الإرسال", false);
+  }
 }
+
 
   async function downloadAllQR(){
 
