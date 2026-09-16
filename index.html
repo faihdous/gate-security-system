@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>نظام أمن البوابات</title>
@@ -10,6 +13,58 @@
 
 
 <style>
+  .qr-print-box{
+  display:none;
+}
+
+@media print{
+  body *{
+    visibility:hidden!important;
+  }
+
+  #qrPrintBox,
+  #qrPrintBox *{
+    visibility:visible!important;
+  }
+
+ #qrPrintBox{
+  display:flex!important;
+  position:absolute;
+  top:10mm;
+  right:10mm;
+  width:45mm;
+  min-height:52mm;
+  padding:4mm;
+  align-items:center;
+  flex-direction:column;
+  justify-content:center;
+  text-align:center;
+  border:1px solid #000;
+  background:#fff;
+}
+
+
+  #qrPrintCode{
+    width:35mm;
+    height:35mm;
+  }
+
+  #qrPrintBox h3{
+    margin:0 0 3mm;
+    font-size:14px;
+  }
+
+  #qrPrintBox p{
+  display:none!important;
+}
+
+
+  @page{
+    size:auto;
+    margin:0;
+  }
+}
+
   .match-list{
   display:grid;
   gap:12px;
@@ -1111,24 +1166,43 @@ tbody tr:last-child td{
 </section>
 
 <section class="card">
-<h2>التحقق من تصريح الدخول</h2>
-<div class="search-row">
-  <input
-    id="civilId"
-    placeholder="أدخل آخر 5 أرقام من الرقم المدني"
-    maxlength="5"
-    inputmode="numeric"
-    autocomplete="off"
-    onkeydown="if(event.key === 'Enter') searchPerson()"
-  >
-  <button onclick="searchPerson()">بحث</button>
-</div>
+  <h2>التحقق من تصريح الدخول</h2>
 
-<div class="hint">
-  أدخل آخر 5 أرقام من الرقم المدني فقط.
-</div>
+  <div class="search-row">
+    <input
+      id="civilId"
+      placeholder="أدخل آخر 5 أرقام من الرقم المدني"
+      maxlength="5"
+      inputmode="numeric"
+      autocomplete="off"
+      onkeydown="if(event.key === 'Enter') searchPerson()"
+    >
 
+    <button type="button" onclick="searchPerson()">
+      بحث
+    </button>
+  </div>
+
+  <div class="hint">
+    أدخل آخر 5 أرقام من الرقم المدني فقط.
+  </div>
+
+  <!-- قارئ QR يظهر هنا -->
+  <div
+    id="qr-reader"
+    style="width:100%;max-width:420px;margin:18px auto 0">
+  </div>
+
+  <button
+    type="button"
+    class="gray"
+    onclick="toggleQRScanner()"
+    id="qrScannerButton"
+    style="width:100%;margin-top:10px">
+    فتح قارئ QR
+  </button>
 </section>
+
 
 <section id="personResult" class="card person hidden"></section>
 
@@ -1887,6 +1961,33 @@ function searchPerson(){
 
   renderPersonMatches(matches);
 }
+function maskCivilId(civilId){
+  const value = normalizeDigits(civilId);
+
+  if(value.length <= 5){
+    return value;
+  }
+
+  return "*".repeat(value.length - 5) + value.slice(-5);
+}
+function selectMatchedPerson(index){
+
+  const matches = window.currentSearchMatches || [];
+  const person = matches[index];
+
+  if(!person){
+    toast("تعذر اختيار الشخص", false);
+    return;
+  }
+
+  currentPerson = person;
+  renderPerson(person);
+
+  $("personResult").scrollIntoView({
+    behavior:"smooth",
+    block:"start"
+  });
+}
 
   function renderPersonMatches(matches){
 
@@ -2270,6 +2371,112 @@ e.target.reset();
 renderPermitsPage();
 toast("تم حفظ التصريح بنجاح");
 })
+  let qrScanner = null;
+let qrScannerRunning = false;
+
+function toggleQRScanner(){
+
+  if(qrScannerRunning){
+    stopQRScanner();
+    return;
+  }
+
+  startQRScanner();
+}
+
+function startQRScanner(){
+
+  if(typeof Html5Qrcode === "undefined"){
+    toast("تعذر تحميل قارئ QR", false);
+    return;
+  }
+
+  qrScanner = new Html5Qrcode("qr-reader");
+
+  qrScanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: {
+        width: 250,
+        height: 250
+      }
+    },
+    qrCodeMessage => {
+      handleScannedQR(qrCodeMessage);
+    },
+    errorMessage => {
+      // تجاهل أخطاء البحث المستمرة أثناء القراءة
+    }
+  )
+  .then(() => {
+    qrScannerRunning = true;
+    $("qrScannerButton").textContent = "إغلاق قارئ QR";
+  })
+  .catch(error => {
+    console.error(error);
+    toast("اسمح للمتصفح باستخدام الكاميرا", false);
+  });
+}
+
+function stopQRScanner(){
+
+  if(!qrScanner){
+    return;
+  }
+
+  qrScanner.stop()
+    .then(() => {
+      qrScanner.clear();
+      qrScanner = null;
+      qrScannerRunning = false;
+      $("qrScannerButton").textContent = "فتح قارئ QR";
+    })
+    .catch(error => {
+      console.error(error);
+    });
+}
+
+function handleScannedQR(qrText){
+
+  try{
+
+    const qrData = JSON.parse(qrText);
+
+    if(qrData.type !== "gate_person" || !qrData.civilId){
+      throw new Error("QR غير صحيح");
+    }
+
+    const civilId = normalizeDigits(qrData.civilId);
+
+    const person = people.find(p =>
+      normalizeDigits(p.civilId) === civilId
+    );
+
+    if(!person){
+      stopQRScanner();
+      toast("لا يوجد تصريح بهذا الرقم المدني", false);
+      return;
+    }
+
+    currentPerson = person;
+    stopQRScanner();
+    renderPerson(person);
+
+    $("personResult").scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+    toast("تم التعرف على العامل بنجاح");
+
+  }catch(error){
+
+    stopQRScanner();
+    toast("رمز QR غير صالح", false);
+  }
+}
+
 function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
 function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
 function deleteCustomField(k){if(!confirm("هل تريد حذف الحقل نهائيًا؟"))return;customFields=customFields.filter(f=>f.key!==k);disabledFields=disabledFields.filter(x=>x!==k);people.forEach(p=>delete p[k]);saveFields();savePeople();renderPermitsPage()}
@@ -2340,7 +2547,230 @@ await addAudit(
 );
 
 editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
-function renderPermitsList(){$("permitsList").innerHTML=!people.length?`<div class="empty">لا توجد تصاريح حاليًا</div>`:`<div class="table-wrapper"><table><tr><th>الاسم</th><th>الرقم المدني</th><th>الشركة</th><th>البداية</th><th>النهاية</th><th>الحالة</th></tr>${people.map(p=>{let s=status(p);return`<tr><td>${esc(p.name)}</td><td>${esc(p.civilId)}</td><td>${esc(p.company||"-")}</td><td>${formatDate(p.permitStart)}</td><td>${formatDate(p.permitEnd)}</td><td><span class="status ${s.css}">${s.text}</span></td></tr>`}).join("")}</table></div>`}
+function renderPermitsList(){
+
+  $("permitsList").innerHTML = !people.length
+    ? `<div class="empty">لا توجد تصاريح حاليًا</div>`
+    : `
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>الرقم المدني</th>
+              <th>الشركة</th>
+              <th>البداية</th>
+              <th>النهاية</th>
+              <th>الحالة</th>
+              <th>QR Code</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${people.map(p => {
+              const s = status(p);
+
+              return `
+                <tr>
+                  <td>${esc(p.name)}</td>
+
+                  <td>${esc(maskCivilId(p.civilId))}</td>
+
+                  <td>${esc(p.company || "-")}</td>
+
+                  <td>${formatDate(p.permitStart)}</td>
+
+                  <td>${formatDate(p.permitEnd)}</td>
+
+                  <td>
+                    <span class="status ${s.css}">
+                      ${s.text}
+                    </span>
+                  </td>
+
+                  <td>
+                    ${
+                      s.allowed
+                      ? `
+                        <button
+                          class="green"
+                          onclick="printPersonQR('${p.id}')">
+                          عرض / طباعة QR
+                        </button>
+
+                        <button
+                          class="orange"
+                          onclick="downloadPersonQR('${p.id}')">
+                          حفظ QR
+                        </button>
+                      `
+                      : `
+                        <button
+                          class="gray"
+                          disabled>
+                          غير فعال
+                        </button>
+                      `
+                    }
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+}
+
+function printPersonQR(personId){
+
+  const person = people.find(p => String(p.id) === String(personId));
+
+  if(!person){
+    toast("لم يتم العثور على التصريح", false);
+    return;
+  }
+
+  $("qrPrintName").textContent = person.name || "";
+  $("qrPrintCode").innerHTML = "";
+  new QRCode($("qrPrintCode"), {
+    text: JSON.stringify({
+      type: "gate_person",
+      civilId: person.civilId
+    }),
+    width: 132,
+    height: 132,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  setTimeout(() => {
+    window.print();
+  }, 300);
+}
+function downloadPersonQR(personId){
+
+  const person = people.find(
+    p => String(p.id) === String(personId)
+  );
+
+  if(!person){
+    toast("لم يتم العثور على التصريح", false);
+    return;
+  }
+
+  const qrContainer = document.createElement("div");
+
+  new QRCode(qrContainer, {
+    text: JSON.stringify({
+      type: "gate_person",
+      civilId: person.civilId
+    }),
+    width: 320,
+    height: 320,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  setTimeout(() => {
+
+    const qrCanvas = qrContainer.querySelector("canvas");
+    const qrImage = qrContainer.querySelector("img");
+
+    const qrWidth = 320;
+    const qrHeight = 320;
+    const padding = 35;
+    const titleHeight = 70;
+
+    const finalCanvas = document.createElement("canvas");
+
+    finalCanvas.width = qrWidth + padding * 2;
+    finalCanvas.height =
+      titleHeight + qrHeight + padding * 2;
+
+    const ctx = finalCanvas.getContext("2d");
+
+    // خلفية بيضاء
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(
+      0,
+      0,
+      finalCanvas.width,
+      finalCanvas.height
+    );
+
+    // اسم العامل فقط فوق QR
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold 28px Tahoma, Arial, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(
+      person.name || "بدون اسم",
+      finalCanvas.width / 2,
+      titleHeight / 2
+    );
+
+    // إضافة QR إلى الصورة النهائية
+    if(qrCanvas){
+
+      ctx.drawImage(
+        qrCanvas,
+        padding,
+        titleHeight
+      );
+
+    }else if(qrImage){
+
+      const image = new Image();
+
+      image.onload = function(){
+
+        ctx.drawImage(
+          image,
+          padding,
+          titleHeight,
+          qrWidth,
+          qrHeight
+        );
+
+        saveQRImage(
+          finalCanvas,
+          person.name
+        );
+      };
+
+      image.src = qrImage.src;
+      return;
+
+    }else{
+      toast("تعذر إنشاء رمز QR", false);
+      return;
+    }
+
+    saveQRImage(
+      finalCanvas,
+      person.name
+    );
+
+  }, 400);
+}
+function saveQRImage(canvas, personName){
+
+  const safeName = String(personName || "العامل")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
+
+  const link = document.createElement("a");
+
+  link.download = `QR_${safeName}.png`;
+  link.href = canvas.toDataURL("image/png");
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  toast("تم حفظ صورة QR بالجهاز");
+}
+
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
 function renderAdminPage(){
   let e = logs.filter(l => l.type === "دخول").length;
@@ -2817,12 +3247,33 @@ async function initialize() {
     return;
   }
 }
+function saveFields(){
+  localStorage.setItem(
+    "gateCustomFields",
+    JSON.stringify(customFields)
+  );
 
-(async function () {
+  localStorage.setItem(
+    "gateDisabledFields",
+    JSON.stringify(disabledFields)
+  );
+}
+
+function savePeople(){
+  // بيانات الأشخاص محفوظة في Supabase
+}
+
+  (async function () {
   await initialize();
 })();
-
-
 </script>
+
+<div id="qrPrintBox" class="qr-print-box">
+  <h3 id="qrPrintName"></h3>
+  <div id="qrPrintCode"></div>
+  <p id="qrPrintCivil"></p>
+</div>
+
 </body>
 </html>
+
