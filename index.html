@@ -2800,10 +2800,11 @@ async function sharePersonQRWithWhatsApp(personId) {
   }
 
   // دعم المشاركة
-  if (!navigator.share || !navigator.canShare) {
-    toast("مشاركة الملفات غير مدعومة على هذا المتصفح", false);
-    return;
-  }
+if (!navigator.share) {
+  toast("مشاركة غير مدعومة على هذا المتصفح", false);
+  return;
+}
+
 
   // نفذ QR على عنصر مؤقت
   const tmp = document.createElement("div");
