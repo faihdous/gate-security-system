@@ -10,6 +10,57 @@
 
 
 <style>
+  .match-list{
+  display:grid;
+  gap:12px;
+  margin-top:18px;
+}
+
+.match-person{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  padding:16px;
+  border:1px solid #d8e8ef;
+  border-radius:15px;
+  background:linear-gradient(135deg,#fafdfe,#edf8fc);
+  transition:.25s ease;
+}
+
+.match-person:hover{
+  transform:translateY(-3px);
+  border-color:var(--cyan);
+  box-shadow:0 8px 20px rgba(3,60,90,.1);
+}
+
+.match-person-info b{
+  display:block;
+  color:var(--blue);
+  margin-bottom:6px;
+}
+
+.match-person-info small{
+  display:block;
+  color:var(--muted);
+  margin-top:4px;
+}
+
+.match-person button{
+  white-space:nowrap;
+}
+
+@media(max-width:600px){
+  .match-person{
+    align-items:stretch;
+    flex-direction:column;
+  }
+
+  .match-person button{
+    width:100%;
+  }
+}
+
 :root{
   --navy:#031426;
   --navy-2:#082b4b;
@@ -1061,7 +1112,22 @@ tbody tr:last-child td{
 
 <section class="card">
 <h2>التحقق من تصريح الدخول</h2>
-<div class="search-row"><input id="civilId" placeholder="أدخل الرقم المدني"><button onclick="searchPerson()">بحث</button></div>
+<div class="search-row">
+  <input
+    id="civilId"
+    placeholder="أدخل آخر 5 أرقام من الرقم المدني"
+    maxlength="5"
+    inputmode="numeric"
+    autocomplete="off"
+    onkeydown="if(event.key === 'Enter') searchPerson()"
+  >
+  <button onclick="searchPerson()">بحث</button>
+</div>
+
+<div class="hint">
+  أدخل آخر 5 أرقام من الرقم المدني فقط.
+</div>
+
 </section>
 
 <section id="personResult" class="card person hidden"></section>
@@ -1761,7 +1827,118 @@ sessionStorage.removeItem("gateAdminUser");
 }
 
 function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
-function searchPerson(){let c=$("civilId").value.trim(),p=people.find(x=>x.civilId===c);if(!c){toast("أدخل الرقم المدني أولًا",false);return}if(!p){currentPerson=null;$("personResult").classList.remove("hidden");$("personResult").innerHTML=`<div><h2>لا يوجد تصريح</h2><p>لم يتم العثور على الرقم المدني: <b>${esc(c)}</b></p><button class="red" onclick="unknownReject('${esc(c)}')">تسجيل محاولة مرفوضة</button></div>`;return}currentPerson=p;renderPerson(p)}
+function normalizeDigits(value){
+  return String(value || "")
+    .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    .replace(/\D/g, "");
+}
+
+function getLastFive(civilId){
+  return normalizeDigits(civilId).slice(-5);
+}
+
+function searchPerson(){
+
+  const input = normalizeDigits($("civilId").value.trim());
+
+  if(!input){
+    toast("أدخل آخر 5 أرقام من الرقم المدني أولًا", false);
+    return;
+  }
+
+  if(input.length !== 5){
+    toast("يجب إدخال آخر 5 أرقام بالضبط", false);
+    return;
+  }
+
+  const matches = people.filter(person => {
+    return getLastFive(person.civilId) === input;
+  });
+
+  currentPerson = null;
+
+  if(!matches.length){
+    $("personResult").classList.remove("hidden");
+
+    $("personResult").innerHTML = `
+      <div>
+        <h2>لا يوجد تصريح</h2>
+        <p>
+          لم يتم العثور على شخص ينتهي رقمه المدني بالأرقام:
+          <b>${esc(input)}</b>
+        </p>
+
+        <button
+          class="red"
+          onclick="unknownReject('${esc(input)}')">
+          تسجيل محاولة مرفوضة
+        </button>
+      </div>
+    `;
+
+    return;
+  }
+
+  if(matches.length === 1){
+    currentPerson = matches[0];
+    renderPerson(currentPerson);
+    return;
+  }
+
+  renderPersonMatches(matches);
+}
+
+  function renderPersonMatches(matches){
+
+  $("personResult").classList.remove("hidden");
+
+  $("personResult").innerHTML = `
+    <div>
+      <h2>تم العثور على أكثر من تطابق</h2>
+
+      <p class="hint">
+        يرجى اختيار الشخص الصحيح قبل تسجيل الدخول أو الخروج.
+      </p>
+
+      <div class="match-list">
+        ${matches.map((person, index) => `
+          <div class="match-person">
+
+            <div class="match-person-info">
+              <b>${esc(person.name || "-")}</b>
+
+              <small>
+                الرقم المدني:
+                ${maskCivilId(person.civilId)}
+              </small>
+
+              <small>
+                الشركة / الجهة:
+                ${esc(person.company || "-")}
+              </small>
+
+              <small>
+                المسمى الوظيفي:
+                ${esc(person.job || "-")}
+              </small>
+            </div>
+
+            <button
+              class="green"
+              onclick="selectMatchedPerson(${index})">
+              اختيار هذا الشخص
+            </button>
+
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  window.currentSearchMatches = matches;
+}
+
+  
 function renderPerson(p){
   let s=status(p);
 
