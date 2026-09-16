@@ -2600,30 +2600,37 @@ function renderPermitsList(){
                   </td>
 
                   <td>
-                    ${
-                      s.allowed
-                      ? `
-                        <button
-                          class="green"
-                          onclick="printPersonQR('${p.id}')">
-                          عرض / طباعة QR
-                        </button>
+  ${
+    s.allowed
+      ? `
+        <button
+          class="green"
+          onclick="printPersonQR('${p.id}')">
+          عرض / طباعة QR
+        </button>
 
-                        <button
-                          class="orange"
-                          onclick="downloadPersonQR('${p.id}')">
-                          حفظ QR
-                        </button>
-                      `
-                      : `
-                        <button
-                          class="gray"
-                          disabled>
-                          غير فعال
-                        </button>
-                      `
-                    }
-                  </td>
+        <button
+          class="orange"
+          onclick="sharePersonQRWithWhatsApp('${p.id}')">
+          إرسال QR واتساب (صورة)
+        </button>
+
+        <button
+          class="orange"
+          onclick="downloadPersonQR('${p.id}')">
+          حفظ QR
+        </button>
+      `
+      : `
+        <button
+          class="gray"
+          disabled>
+          غير فعال
+        </button>
+      `
+  }
+</td>
+
                 </tr>
               `;
             }).join("")}
@@ -2783,6 +2790,75 @@ function downloadPersonQR(personId){
     logo.src = "logo.png";
 
   }, 500);
+}
+async function sharePersonQRWithWhatsApp(personId) {
+  const person = people.find(p => String(p.id) === String(personId));
+
+  if (!person) {
+    toast("لم يتم العثور على التصريح", false);
+    return;
+  }
+
+  // دعم المشاركة
+  if (!navigator.share || !navigator.canShare) {
+    toast("مشاركة الملفات غير مدعومة على هذا المتصفح", false);
+    return;
+  }
+
+  // نفذ QR على عنصر مؤقت
+  const tmp = document.createElement("div");
+  tmp.style.position = "fixed";
+  tmp.style.left = "-9999px";
+  tmp.style.top = "0";
+  document.body.appendChild(tmp);
+
+  tmp.innerHTML = `<div id="tmpQr"></div>`;
+
+  new QRCode(tmp.querySelector("#tmpQr"), {
+    text: JSON.stringify({
+      type: "gate_person",
+      civilId: person.civilId
+    }),
+    width: 520,
+    height: 520,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  // انتظر ظهور canvas
+  const canvas = await new Promise((resolve) => {
+    const t = setInterval(() => {
+      const c = tmp.querySelector("canvas");
+      if (c) {
+        clearInterval(t);
+        resolve(c);
+      }
+    }, 50);
+  });
+
+  canvas.toBlob(async (blob) => {
+    try {
+      if (!blob) throw new Error("Blob QR غير متاح");
+
+      const safeName = String(person.name || "QR")
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .trim();
+
+      const file = new File([blob], `QR_${safeName}.png`, { type: "image/png" });
+
+      await navigator.share({
+        files: [file],
+        title: "QR تصريح",
+        text: `QR تصريح - ${person.name || ""}`.trim()
+      });
+
+      toast("تم تجهيز مشاركة QR (اختَر واتساب)", true);
+    } catch (e) {
+      console.error(e);
+      toast("تعذر إرسال QR كصورة", false);
+    } finally {
+      tmp.remove();
+    }
+  }, "image/png");
 }
 
   async function downloadAllQR(){
