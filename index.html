@@ -2695,7 +2695,7 @@ function downloadPersonQR(personId){
 
     finalCanvas.width = qrWidth + padding * 2;
     finalCanvas.height =
-      titleHeight + qrHeight + padding * 2;
+  195 + qrHeight + padding * 2;
 
     const ctx = finalCanvas.getContext("2d");
 
@@ -2708,17 +2708,60 @@ function downloadPersonQR(personId){
       finalCanvas.height
     );
 
-    // اسم العامل فقط فوق QR
-    ctx.fillStyle = "#000000";
-    ctx.font = "bold 28px Tahoma, Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+   const logo = new Image();
 
-    ctx.fillText(
-      person.name || "بدون اسم",
-      finalCanvas.width / 2,
-      titleHeight / 2
-    );
+logo.onload = function(){
+
+  const logoSize = 90;
+  const logoX = finalCanvas.width / 2 - logoSize / 2;
+
+  // الشعار
+  ctx.drawImage(
+    logo,
+    logoX,
+    15,
+    logoSize,
+    logoSize
+  );
+
+  // اسم الإدارة
+  ctx.fillStyle = "#000000";
+  ctx.font = "bold 22px Tahoma, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.fillText(
+    "الإدارة العامة للجنسية ووثائق السفر الكويتية",
+    finalCanvas.width / 2,
+    125
+  );
+
+  // اسم العامل
+  ctx.font = "bold 26px Tahoma, Arial, sans-serif";
+
+  ctx.fillText(
+    person.name || "بدون اسم",
+    finalCanvas.width / 2,
+    165
+  );
+
+  // رمز QR
+  ctx.drawImage(
+    qrCanvas,
+    padding,
+    195,
+    qrWidth,
+    qrHeight
+  );
+
+  saveQRImage(
+    finalCanvas,
+    person.name
+  );
+};
+
+logo.src = "logo.png";
+
 
     // إضافة QR إلى الصورة النهائية
     if(qrCanvas){
