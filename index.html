@@ -1519,6 +1519,7 @@ function dbToPermit(row){
   return {
     id: row.id,
     civilId: row.civil_id,
+    qrToken: row.qr_token, // <-- أضفنا هذا السطر (بالخطوة 2)
     name: row.full_name,
     company: row.company || "",
     job: row.job || "",
@@ -2454,19 +2455,19 @@ function handleScannedQR(qrText){
 
     const qrData = JSON.parse(qrText);
 
-    if(qrData.type !== "gate_person" || !qrData.civilId){
+    if(qrData.type !== "gate_person" || !qrData.qrToken){
       throw new Error("QR غير صحيح");
     }
 
-    const civilId = normalizeDigits(qrData.civilId);
+    const token = normalizeDigits(qrData.qrToken);
 
     const person = people.find(p =>
-      normalizeDigits(p.civilId) === civilId
+      normalizeDigits(p.qrToken) === token
     );
 
     if(!person){
       stopQRScanner();
-      toast("لا يوجد تصريح بهذا الرقم المدني", false);
+      toast("لا يوجد تصريح بهذا QR Token", false);
       return;
     }
 
@@ -2815,14 +2816,13 @@ async function sharePersonQRWithWhatsApp(personId){
   new QRCode(qrContainer, {
     text: JSON.stringify({
       type: "gate_person",
-      civilId: person.civilId
+      qrToken: person.qrToken
     }),
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  // انتظر ظهور QR canvas داخل qrContainer
   await new Promise(resolve => setTimeout(resolve, 500));
 
   const qrCanvas = qrContainer.querySelector("canvas");
@@ -2841,9 +2841,8 @@ async function sharePersonQRWithWhatsApp(personId){
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-  // الشعار + النصوص + QR (نفس سيناريو downloadPersonQR بالضبط)
+  // الشعار + النصوص + QR
   const logo = new Image();
-
   await new Promise((resolve, reject) => {
     logo.onload = () => resolve();
     logo.onerror = () => reject();
@@ -2853,10 +2852,8 @@ async function sharePersonQRWithWhatsApp(personId){
     return;
   });
 
-  // الشعار
   const logoSize = 85;
   const logoX = (canvasWidth - logoSize) / 2;
-
   ctx.drawImage(logo, logoX, 10, logoSize, logoSize);
 
   ctx.fillStyle = "#000000";
@@ -2874,7 +2871,6 @@ async function sharePersonQRWithWhatsApp(personId){
   const qrX = (canvasWidth - qrSize) / 2;
   ctx.drawImage(qrCanvas, qrX, headerHeight);
 
-  // حول finalCanvas إلى blob ثم File وارسله واتساب
   const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, "image/png"));
   if(!blob){
     toast("تعذر تجهيز صورة QR", false);
@@ -2900,6 +2896,7 @@ async function sharePersonQRWithWhatsApp(personId){
     toast("تم الإلغاء أو تعذر الإرسال", false);
   }
 }
+
 
 
   async function downloadAllQR(){
