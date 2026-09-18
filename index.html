@@ -2450,10 +2450,14 @@ function stopQRScanner(){
 
 async function handleScannedQR(qrText){
   try{
-    const token = String(qrText || "").trim();
-    if(!token) throw new Error("QR غير صالح");
+    const token = String(qrText ?? "").trim();
+    if(!token) throw new Error("QR غير صالح/فارغ");
 
-    // جلب access token
+    console.log("[QR] qrText:", qrText);
+    console.log("[QR] token:", token);
+    console.log("[QR] token length:", token.length);
+
+    // جلب access token (لإرسال الاستدعاء من نفس الجلسة)
     const sessionData = await supabaseClient.auth.getSession();
     const accessToken =
       sessionData?.data?.session?.access_token
@@ -2465,9 +2469,8 @@ async function handleScannedQR(qrText){
       return;
     }
 
-    console.log("[QR] invoke verify-gate-token, token length:", token.length);
+    console.log("[QR] invoke verify-gate-token...");
 
-    // ✅ استدعاء Edge Function بالطريقة الصحيحة لتجنب 404
     const { data, error } = await supabaseClient.functions.invoke(
       "verify-gate-token",
       { body: { token } }
@@ -2481,17 +2484,21 @@ async function handleScannedQR(qrText){
       return;
     }
 
-    // حسب رد دالتك
-    if(!data?.permitId){
+    // ✅ بعض الدوال ترجع permitId أو permit_id (حسب كود الـ Edge)
+    const permitId =
+      data?.permitId ?? data?.permit_id ?? data?.permitID ?? null;
+
+    if(!permitId){
       stopQRScanner();
-      toast("QR غير صالح/منتهي", false);
+      toast("QR غير صالح/منتهي (لا يوجد permitId في الرد)", false);
       return;
     }
 
-    const person = people.find(p => String(p.id) === String(data.permitId));
+    const person = people.find(p => String(p.id) === String(permitId));
+
     if(!person){
       stopQRScanner();
-      toast("لا يوجد تصريح لهذا الـ permitId", false);
+      toast("لا يوجد تصريح لهذا الـ permitId: " + String(permitId), false);
       return;
     }
 
