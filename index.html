@@ -2451,12 +2451,9 @@ function stopQRScanner(){
 async function handleScannedQR(qrText){
   try{
     const token = String(qrText || "").trim();
+    if(!token) throw new Error("QR غير صالح");
 
-    if(!token){
-      throw new Error("QR غير صالح");
-    }
-
-    // جلب Access Token من جلسة Supabase
+    // جلب access token
     const sessionData = await supabaseClient.auth.getSession();
     const accessToken =
       sessionData?.data?.session?.access_token
@@ -2468,39 +2465,29 @@ async function handleScannedQR(qrText){
       return;
     }
 
-    // استدعاء Edge Function بـ POST + Authorization header
-    const endpoint = `${SUPABASE_URL}/functions/v1/verify-gate-token`;
+    console.log("[QR] invoke verify-gate-token, token length:", token.length);
 
-    console.log("[QR] Calling endpoint:", endpoint);
-    console.log("[QR] Token length:", token.length);
+    // ✅ استدعاء Edge Function بالطريقة الصحيحة لتجنب 404
+    const { data, error } = await supabaseClient.functions.invoke(
+      "verify-gate-token",
+      { body: { token } }
+    );
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token }),
-    });
+    console.log("[QR] invoke result:", { data, error });
 
-    console.log("[QR] verify-gate-token status:", res.status);
+    if(error){
+      stopQRScanner();
+      toast("تعذر التحقق من QR: " + (error.message || "خطأ"), false);
+      return;
+    }
 
-    let rawText = "";
-    try { rawText = await res.text(); } catch {}
-    console.log("[QR] verify-gate-token raw response:", rawText);
-
-    let data = {};
-    try { data = JSON.parse(rawText || "{}"); } catch { data = {}; }
-    console.log("[QR] verify-gate-token parsed data:", data);
-
-    // نفس شرطك السابق
-    if(!res.ok || !data?.permitId){
+    // حسب رد دالتك
+    if(!data?.permitId){
       stopQRScanner();
       toast("QR غير صالح/منتهي", false);
       return;
     }
 
-    // حدد الشخص من permitId
     const person = people.find(p => String(p.id) === String(data.permitId));
     if(!person){
       stopQRScanner();
