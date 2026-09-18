@@ -2451,17 +2451,20 @@ function stopQRScanner(){
 async function handleScannedQR(qrText){
   try{
     const token = String(qrText ?? "").trim();
+
     if(!token) throw new Error("QR غير صالح/فارغ");
 
-    console.log("[QR] qrText:", qrText);
-    console.log("[QR] token:", token);
-    console.log("[QR] token length:", token.length);
+    console.log("QR raw:", JSON.stringify(qrText));
+    console.log("QR trimmed:", JSON.stringify(token));
+    console.log("QR trimmed length:", token.length);
 
-    // جلب access token (لإرسال الاستدعاء من نفس الجلسة)
+    // جلب access token من نفس الجلسة
     const sessionData = await supabaseClient.auth.getSession();
     const accessToken =
-      sessionData?.data?.session?.access_token
-      || sessionData?.session?.access_token;
+      sessionData?.data?.session?.access_token ||
+      sessionData?.session?.access_token;
+
+    console.log("Has accessToken:", !!accessToken);
 
     if(!accessToken){
       stopQRScanner();
@@ -2469,8 +2472,8 @@ async function handleScannedQR(qrText){
       return;
     }
 
+    // جرّب الاستدعاء للدالة
     console.log("[QR] invoke verify-gate-token...");
-
     const { data, error } = await supabaseClient.functions.invoke(
       "verify-gate-token",
       { body: { token } }
@@ -2480,13 +2483,17 @@ async function handleScannedQR(qrText){
 
     if(error){
       stopQRScanner();
-      toast("تعذر التحقق من QR: " + (error.message || "خطأ"), false);
+      toast(
+        "تعذر التحقق من QR: " + (error.message || JSON.stringify(error)),
+        false
+      );
       return;
     }
 
-    // ✅ بعض الدوال ترجع permitId أو permit_id (حسب كود الـ Edge)
     const permitId =
       data?.permitId ?? data?.permit_id ?? data?.permitID ?? null;
+
+    console.log("[QR] permitId resolved:", permitId);
 
     if(!permitId){
       stopQRScanner();
@@ -2514,7 +2521,7 @@ async function handleScannedQR(qrText){
     toast("تم التعرف على العامل بنجاح");
 
   }catch(e){
-    console.error(e);
+    console.error("handleScannedQR error:", e);
     stopQRScanner();
     toast("رمز QR غير صالح", false);
   }
