@@ -2448,25 +2448,57 @@ function stopQRScanner(){
     });
 }
 
-function handleScannedQR(qrText){
-
+async function handleScannedQR(qrText){
   try{
+    const token = String(qrText ?? "").trim();
+    if(!token) throw new Error("QR غير صالح/فارغ");
 
-    const qrData = JSON.parse(qrText);
+    console.log("[QR] qrText:", qrText);
+    console.log("[QR] token:", token);
+    console.log("[QR] token length:", token.length);
 
-    if(qrData.type !== "gate_person" || !qrData.civilId){
-      throw new Error("QR غير صحيح");
+    // جلب access token (لإرسال الاستدعاء من نفس الجلسة)
+    const sessionData = await supabaseClient.auth.getSession();
+    const accessToken =
+      sessionData?.data?.session?.access_token
+      || sessionData?.session?.access_token;
+
+    if(!accessToken){
+      stopQRScanner();
+      toast("الرجاء تسجيل الدخول أولًا (لا يوجد Authorization Token)", false);
+      return;
     }
 
-    const civilId = normalizeDigits(qrData.civilId);
+    console.log("[QR] invoke verify-gate-token...");
 
-    const person = people.find(p =>
-      normalizeDigits(p.civilId) === civilId
+    const { data, error } = await supabaseClient.functions.invoke(
+      "verify-gate-token",
+      { body: { token } }
     );
+
+    console.log("[QR] invoke result:", { data, error });
+
+    if(error){
+      stopQRScanner();
+      toast("تعذر التحقق من QR: " + (error.message || "خطأ"), false);
+      return;
+    }
+
+    // ✅ بعض الدوال ترجع permitId أو permit_id (حسب كود الـ Edge)
+    const permitId =
+      data?.permitId ?? data?.permit_id ?? data?.permitID ?? null;
+
+    if(!permitId){
+      stopQRScanner();
+      toast("QR غير صالح/منتهي (لا يوجد permitId في الرد)", false);
+      return;
+    }
+
+    const person = people.find(p => String(p.id) === String(permitId));
 
     if(!person){
       stopQRScanner();
-      toast("لا يوجد تصريح بهذا الرقم المدني", false);
+      toast("لا يوجد تصريح لهذا الـ permitId: " + String(permitId), false);
       return;
     }
 
@@ -2481,8 +2513,8 @@ function handleScannedQR(qrText){
 
     toast("تم التعرف على العامل بنجاح");
 
-  }catch(error){
-
+  }catch(e){
+    console.error(e);
     stopQRScanner();
     toast("رمز QR غير صالح", false);
   }
@@ -2640,7 +2672,7 @@ function renderPermitsList(){
     `;
 }
 
-function printPersonQR(personId){
+async function printPersonQR(personId){
 
   const person = people.find(p => String(p.id) === String(personId));
 
@@ -2651,11 +2683,20 @@ function printPersonQR(personId){
 
   $("qrPrintName").textContent = person.name || "";
   $("qrPrintCode").innerHTML = "";
+
+  // جلب token آمن من Edge Function (لا ترجع مدني)
+  const { data, error } = await supabaseClient.functions.invoke(
+    "get-gate-token",
+    { body: { permitId: person.id } }
+  );
+
+  if(error || !data?.token){
+    toast("تعذر إنشاء QR آمن", false);
+    return;
+  }
+
   new QRCode($("qrPrintCode"), {
-    text: JSON.stringify({
-      type: "gate_person",
-      civilId: person.civilId
-    }),
+    text: data.token, // <<< فقط token (بدون civilId)
     width: 132,
     height: 132,
     correctLevel: QRCode.CorrectLevel.M
@@ -2665,12 +2706,10 @@ function printPersonQR(personId){
     window.print();
   }, 300);
 }
-function downloadPersonQR(personId){
 
-  const person = people.find(
-    p => String(p.id) === String(personId)
-  );
+async function downloadPersonQR(personId){
 
+  const person = people.find(p => String(p.id) === String(personId));
   if(!person){
     toast("لم يتم العثور على التصريح", false);
     return;
@@ -2681,106 +2720,70 @@ function downloadPersonQR(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  const qrContainer = document.createElement("div");
+  // 1) جلب token من Edge function
+  const { data, error } = await supabaseClient.functions.invoke(
+    "get-gate-token",
+    { body: { permitId: person.id } }
+  );
 
+  if(error || !data?.token){
+    toast("تعذر إنشاء QR آمن", false);
+    return;
+  }
+
+  const token = data.token;
+
+  // 2) أنشئ QR من token فقط
+  const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: JSON.stringify({
-      type: "gate_person",
-      civilId: person.civilId
-    }),
+    text: token,                // token فقط
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
   });
 
   setTimeout(() => {
-
     const qrCanvas = qrContainer.querySelector("canvas");
-
     if(!qrCanvas){
       toast("تعذر إنشاء رمز QR", false);
       return;
     }
 
     const finalCanvas = document.createElement("canvas");
-
     finalCanvas.width = canvasWidth;
-    finalCanvas.height =
-      headerHeight + qrSize + padding * 2;
+    finalCanvas.height = headerHeight + qrSize + padding * 2;
 
     const ctx = finalCanvas.getContext("2d");
 
     // خلفية بيضاء
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(
-      0,
-      0,
-      finalCanvas.width,
-      finalCanvas.height
-    );
+    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
     const logo = new Image();
 
     logo.onload = function(){
-
       // الشعار
       const logoSize = 85;
-      const logoX =
-        (canvasWidth - logoSize) / 2;
+      const logoX = (canvasWidth - logoSize) / 2;
 
-      ctx.drawImage(
-        logo,
-        logoX,
-        10,
-        logoSize,
-        logoSize
-      );
+      ctx.drawImage(logo, logoX, 10, logoSize, logoSize);
 
       ctx.fillStyle = "#000000";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      /*
-       * اسم الإدارة على سطرين
-       * حتى لا يتم قصه من الجانبين
-       */
       ctx.font = "bold 19px Tahoma, Arial, sans-serif";
+      ctx.fillText("الإدارة العامة للجنسية", canvasWidth / 2, 120);
+      ctx.fillText("ووثائق السفر الكويتية", canvasWidth / 2, 145);
 
-      ctx.fillText(
-        "الإدارة العامة للجنسية",
-        canvasWidth / 2,
-        120
-      );
-
-      ctx.fillText(
-        "ووثائق السفر الكويتية",
-        canvasWidth / 2,
-        145
-      );
-
-      // اسم العامل
       ctx.font = "bold 24px Tahoma, Arial, sans-serif";
+      ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
 
-      ctx.fillText(
-        person.name || "بدون اسم",
-        canvasWidth / 2,
-        185
-      );
+      // QR في المنتصف
+      const qrX = (canvasWidth - qrSize) / 2;
+      ctx.drawImage(qrCanvas, qrX, headerHeight);
 
-      // رمز QR في المنتصف
-      const qrX =
-        (canvasWidth - qrSize) / 2;
-
-      ctx.drawImage(
-        qrCanvas,
-        qrX,
-        headerHeight
-      );
-
-      saveQRImage(
-        finalCanvas,
-        person.name
-      );
+      saveQRImage(finalCanvas, person.name);
     };
 
     logo.onerror = function(){
@@ -2791,6 +2794,7 @@ function downloadPersonQR(personId){
 
   }, 500);
 }
+
 async function sharePersonQRWithWhatsApp(personId){
 
   const person = people.find(p => String(p.id) === String(personId));
@@ -2809,20 +2813,28 @@ async function sharePersonQRWithWhatsApp(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  // نحتاج QR canvas جاهز
-  const qrContainer = document.createElement("div");
+  // 1) جلب token من Edge function
+  const { data, error } = await supabaseClient.functions.invoke(
+    "get-gate-token",
+    { body: { permitId: person.id } }
+  );
 
+  if(error || !data?.token){
+    toast("تعذر إنشاء QR آمن", false);
+    return;
+  }
+
+  const token = data.token;
+
+  // 2) QR من token فقط
+  const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: JSON.stringify({
-      type: "gate_person",
-      civilId: person.civilId
-    }),
+    text: token,  // token فقط
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  // انتظر ظهور QR canvas داخل qrContainer
   await new Promise(resolve => setTimeout(resolve, 500));
 
   const qrCanvas = qrContainer.querySelector("canvas");
@@ -2841,9 +2853,8 @@ async function sharePersonQRWithWhatsApp(personId){
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-  // الشعار + النصوص + QR (نفس سيناريو downloadPersonQR بالضبط)
+  // الشعار
   const logo = new Image();
-
   await new Promise((resolve, reject) => {
     logo.onload = () => resolve();
     logo.onerror = () => reject();
@@ -2853,7 +2864,6 @@ async function sharePersonQRWithWhatsApp(personId){
     return;
   });
 
-  // الشعار
   const logoSize = 85;
   const logoX = (canvasWidth - logoSize) / 2;
 
@@ -2874,17 +2884,14 @@ async function sharePersonQRWithWhatsApp(personId){
   const qrX = (canvasWidth - qrSize) / 2;
   ctx.drawImage(qrCanvas, qrX, headerHeight);
 
-  // حول finalCanvas إلى blob ثم File وارسله واتساب
+  // حول finalCanvas إلى blob ثم File وارسله
   const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, "image/png"));
   if(!blob){
     toast("تعذر تجهيز صورة QR", false);
     return;
   }
 
-  const safeName = String(person.name || "QR")
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .trim();
-
+  const safeName = String(person.name || "QR").replace(/[\\/:*?"<>|]/g, "_").trim();
   const file = new File([blob], `QR_${safeName}.png`, { type: "image/png" });
 
   try{
@@ -2893,7 +2900,6 @@ async function sharePersonQRWithWhatsApp(personId){
       title: "QR تصريح",
       text: `QR تصريح - ${person.name || ""}`.trim()
     });
-
     toast("تم إرسال صورة QR عبر واتساب", true);
   }catch(e){
     console.error(e);
