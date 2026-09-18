@@ -2456,32 +2456,44 @@ async function handleScannedQR(qrText){
       throw new Error("QR غير صالح");
     }
 
-    // جلب Access Token من جلسة Supabase (مطلوب لكي ترجع Edge Function بدون 401)
+    // جلب Access Token من جلسة Supabase
     const sessionData = await supabaseClient.auth.getSession();
-    const accessToken = sessionData?.data?.session?.access_token
+    const accessToken =
+      sessionData?.data?.session?.access_token
       || sessionData?.session?.access_token;
 
-    if (!accessToken) {
+    if(!accessToken){
       stopQRScanner();
       toast("الرجاء تسجيل الدخول أولًا (لا يوجد Authorization Token)", false);
       return;
     }
 
     // استدعاء Edge Function بـ POST + Authorization header
-    const res = await fetch(
-      `${SUPABASE_URL}/functions/v1/verify-gate-token`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token }),
-      }
-    );
+    const endpoint = `${SUPABASE_URL}/functions/v1/verify-gate-token`;
 
-    const data = await res.json().catch(() => ({}));
+    console.log("[QR] Calling endpoint:", endpoint);
+    console.log("[QR] Token length:", token.length);
 
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    console.log("[QR] verify-gate-token status:", res.status);
+
+    let rawText = "";
+    try { rawText = await res.text(); } catch {}
+    console.log("[QR] verify-gate-token raw response:", rawText);
+
+    let data = {};
+    try { data = JSON.parse(rawText || "{}"); } catch { data = {}; }
+    console.log("[QR] verify-gate-token parsed data:", data);
+
+    // نفس شرطك السابق
     if(!res.ok || !data?.permitId){
       stopQRScanner();
       toast("QR غير صالح/منتهي", false);
