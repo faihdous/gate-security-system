@@ -2449,7 +2449,6 @@ function stopQRScanner(){
 }
 
 async function handleScannedQR(qrText){
-
   try{
     // token يكون نص فقط (بدون JSON)
     const token = String(qrText || "").trim();
@@ -2459,9 +2458,10 @@ async function handleScannedQR(qrText){
     }
 
     // تحقق من token عبر Edge Function
+    // (جرّبنا name لأن في الـ Invoke عندك curl يستخدم غالبًا name)
     const { data, error } = await supabaseClient.functions.invoke(
-      "verify-gate-token", // لازم يكون عندك هذه الدالة
-      { body: { token } }
+      "verify-gate-token",
+      { body: { token, name: token } } // <-- هذا التعديل
     );
 
     if(error || !data?.permitId){
@@ -2490,6 +2490,7 @@ async function handleScannedQR(qrText){
     toast("تم التعرف على العامل بنجاح");
 
   }catch(e){
+    console.error(e);
     stopQRScanner();
     toast("رمز QR غير صالح", false);
   }
