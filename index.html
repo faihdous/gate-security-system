@@ -2450,21 +2450,39 @@ function stopQRScanner(){
 
 async function handleScannedQR(qrText){
   try{
-    // token يكون نص فقط (بدون JSON)
     const token = String(qrText || "").trim();
 
     if(!token){
       throw new Error("QR غير صالح");
     }
 
-    // تحقق من token عبر Edge Function
-    // (جرّبنا name لأن في الـ Invoke عندك curl يستخدم غالبًا name)
-    const { data, error } = await supabaseClient.functions.invoke(
-      "verify-gate-token",
-      { body: { token, name: token } } // <-- هذا التعديل
+    // جلب Access Token من جلسة Supabase (مطلوب لكي ترجع Edge Function بدون 401)
+    const sessionData = await supabaseClient.auth.getSession();
+    const accessToken = sessionData?.data?.session?.access_token
+      || sessionData?.session?.access_token;
+
+    if (!accessToken) {
+      stopQRScanner();
+      toast("الرجاء تسجيل الدخول أولًا (لا يوجد Authorization Token)", false);
+      return;
+    }
+
+    // استدعاء Edge Function بـ POST + Authorization header
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/verify-gate-token`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      }
     );
 
-    if(error || !data?.permitId){
+    const data = await res.json().catch(() => ({}));
+
+    if(!res.ok || !data?.permitId){
       stopQRScanner();
       toast("QR غير صالح/منتهي", false);
       return;
