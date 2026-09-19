@@ -2453,17 +2453,19 @@ async function handleScannedQR(qrText){
     const civil = normalizeDigits(qrText ?? "").trim();
 
     if(!civil) throw new Error("QR غير صالح/فارغ");
+    if(civil.length !== 5){
+      stopQRScanner();
+      toast("QR غير صالح (يجب أن يحتوي آخر 5 أرقام)", false);
+      return;
+    }
 
-    // إذا QR يحتوي آخر 5 أرقام فقط بدل كامل، استخدم نسخة getLastFive (أرسل لك فورًا)
-    const matches = people.filter(p =>
-      normalizeDigits(p.civilId) === civil
-    );
+    const matches = people.filter(p => getLastFive(p.civilId) === civil);
 
     currentPerson = null;
 
     if(!matches.length){
       stopQRScanner();
-      toast("لا يوجد تصريح بهذا الرقم المدني", false);
+      toast("لا يوجد تصريح بهذا الرقم المدني (آخر 5 أرقام)", false);
       return;
     }
 
@@ -2490,6 +2492,7 @@ async function handleScannedQR(qrText){
     toast("رمز QR غير صالح", false);
   }
 }
+
 
 function addCustomField(){let l=$("newFieldName").value.trim();if(!l)return toast("اكتب اسم الحقل أولًا",false);let k=l.replace(/[^\u0600-\u06FFa-zA-Z0-9]+/g,"_"),n=2,b=k;while(allFields().some(f=>f.key===b))b=k+"_"+n++;customFields.push({key:b,label:l,type:"text",required:false,system:false});$("newFieldName").value="";saveFields();renderPermitsPage();toast("تمت إضافة الحقل")}
 function toggleField(k){disabledFields.includes(k)?disabledFields=disabledFields.filter(x=>x!==k):disabledFields.push(k);saveFields();renderPermitsPage()}
@@ -2666,6 +2669,7 @@ async function printPersonQR(personId){
 }
 
 async function downloadPersonQR(personId){
+
   const person = people.find(p => String(p.id) === String(personId));
   if(!person){
     toast("لم يتم العثور على التصريح", false);
@@ -2677,12 +2681,12 @@ async function downloadPersonQR(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  const civil = normalizeDigits(person.civilId);
+  const last5 = getLastFive(person.civilId);
 
-  // أنشئ QR من المدني فقط
+  // أنشئ QR من آخر 5 أرقام فقط
   const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: civil,
+    text: last5,
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
@@ -2701,6 +2705,7 @@ async function downloadPersonQR(personId){
 
     const ctx = finalCanvas.getContext("2d");
 
+    // خلفية بيضاء
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
@@ -2722,6 +2727,7 @@ async function downloadPersonQR(personId){
       ctx.font = "bold 24px Tahoma, Arial, sans-serif";
       ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
 
+      // QR في المنتصف
       const qrX = (canvasWidth - qrSize) / 2;
       ctx.drawImage(qrCanvas, qrX, headerHeight);
 
@@ -2737,6 +2743,7 @@ async function downloadPersonQR(personId){
 }
 
 async function sharePersonQRWithWhatsApp(personId){
+
   const person = people.find(p => String(p.id) === String(personId));
   if(!person){
     toast("لم يتم العثور على التصريح", false);
@@ -2753,11 +2760,12 @@ async function sharePersonQRWithWhatsApp(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  const civil = normalizeDigits(person.civilId);
+  const last5 = getLastFive(person.civilId);
 
+  // QR من آخر 5 أرقام فقط
   const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: civil,
+    text: last5,
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
@@ -2777,9 +2785,11 @@ async function sharePersonQRWithWhatsApp(personId){
 
   const ctx = finalCanvas.getContext("2d");
 
+  // خلفية بيضاء
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
+  // الشعار
   const logo = new Image();
   await new Promise((resolve, reject) => {
     logo.onload = () => resolve();
@@ -2806,6 +2816,7 @@ async function sharePersonQRWithWhatsApp(personId){
   ctx.font = "bold 24px Tahoma, Arial, sans-serif";
   ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
 
+  // QR في المنتصف
   const qrX = (canvasWidth - qrSize) / 2;
   ctx.drawImage(qrCanvas, qrX, headerHeight);
 
