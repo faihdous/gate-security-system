@@ -2450,70 +2450,33 @@ function stopQRScanner(){
 
 async function handleScannedQR(qrText){
   try{
-    const token = String(qrText ?? "").trim();
+    const civil = normalizeDigits(qrText ?? "").trim();
 
-    if(!token) throw new Error("QR غير صالح/فارغ");
+    if(!civil) throw new Error("QR غير صالح/فارغ");
 
-    console.log("QR raw:", JSON.stringify(qrText));
-    console.log("QR trimmed:", JSON.stringify(token));
-    console.log("QR trimmed length:", token.length);
+    // إذا QR يحتوي آخر 5 أرقام فقط بدل كامل، استخدم نسخة getLastFive (أرسل لك فورًا)
+    const matches = people.filter(p =>
+      normalizeDigits(p.civilId) === civil
+    );
 
-    // جلب access token من نفس الجلسة (اختياري - فقط للتوثيق إن كان edge يحتاجه)
-    let accessToken = null;
-    try{
-      const sessionData = await supabaseClient.auth.getSession();
-      accessToken =
-        sessionData?.data?.session?.access_token ||
-        sessionData?.session?.access_token ||
-        null;
-    }catch(_){}
+    currentPerson = null;
 
-    // استدعاء Edge function عبر GET مع token في الرابط
-    // مهم جدًا: لازم يظهر في الـ Network مثل ...verify-gate-token?token=xxxxx
-    const url =
-      `${SUPABASE_URL}/functions/v1/verify-gate-token?token=${encodeURIComponent(token)}`;
-
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {})
-      }
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if(!res.ok){
+    if(!matches.length){
       stopQRScanner();
-      toast(
-        "تعذر التحقق من QR: " + (data?.error || `HTTP ${res.status}`),
-        false
-      );
+      toast("لا يوجد تصريح بهذا الرقم المدني", false);
       return;
     }
 
-    const permitId =
-      data?.permitId ?? data?.permit_id ?? data?.permitID ?? null;
-
-    console.log("verify-gate-token response:", data);
-    console.log("permitId resolved:", permitId);
-
-    if(!permitId){
+    if(matches.length > 1){
       stopQRScanner();
-      toast("QR غير صالح/منتهي (لا يوجد permitId في الرد)", false);
+      renderPersonMatches(matches);
+      toast("تم العثور على أكثر من تطابق", true);
       return;
     }
 
-    const person = people.find(p => String(p.id) === String(permitId));
-
-    if(!person){
-      stopQRScanner();
-      toast("لا يوجد تصريح لهذا الـ permitId: " + String(permitId), false);
-      return;
-    }
-
-    currentPerson = person;
+    currentPerson = matches[0];
     stopQRScanner();
-    renderPerson(person);
+    renderPerson(currentPerson);
 
     $("personResult").scrollIntoView({
       behavior: "smooth",
@@ -2521,7 +2484,6 @@ async function handleScannedQR(qrText){
     });
 
     toast("تم التعرف على العامل بنجاح");
-
   }catch(e){
     console.error("handleScannedQR error:", e);
     stopQRScanner();
@@ -2684,7 +2646,6 @@ function renderPermitsList(){
 async function printPersonQR(personId){
 
   const person = people.find(p => String(p.id) === String(personId));
-
   if(!person){
     toast("لم يتم العثور على التصريح", false);
     return;
@@ -2693,31 +2654,18 @@ async function printPersonQR(personId){
   $("qrPrintName").textContent = person.name || "";
   $("qrPrintCode").innerHTML = "";
 
-  // جلب token آمن من Edge Function (لا ترجع مدني)
-  const { data, error } = await supabaseClient.functions.invoke(
-    "get-gate-token",
-    { body: { permitId: person.id } }
-  );
-
-  if(error || !data?.token){
-    toast("تعذر إنشاء QR آمن", false);
-    return;
-  }
-
+  // QR من الرقم المدني مباشرة
   new QRCode($("qrPrintCode"), {
-    text: data.token, // <<< فقط token (بدون civilId)
+    text: normalizeDigits(person.civilId), // <-- مدني بدل token
     width: 132,
     height: 132,
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  setTimeout(() => {
-    window.print();
-  }, 300);
+  setTimeout(() => window.print(), 300);
 }
 
 async function downloadPersonQR(personId){
-
   const person = people.find(p => String(p.id) === String(personId));
   if(!person){
     toast("لم يتم العثور على التصريح", false);
@@ -2729,23 +2677,12 @@ async function downloadPersonQR(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  // 1) جلب token من Edge function
-  const { data, error } = await supabaseClient.functions.invoke(
-    "get-gate-token",
-    { body: { permitId: person.id } }
-  );
+  const civil = normalizeDigits(person.civilId);
 
-  if(error || !data?.token){
-    toast("تعذر إنشاء QR آمن", false);
-    return;
-  }
-
-  const token = data.token;
-
-  // 2) أنشئ QR من token فقط
+  // أنشئ QR من المدني فقط
   const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: token,                // token فقط
+    text: civil,
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
@@ -2764,14 +2701,11 @@ async function downloadPersonQR(personId){
 
     const ctx = finalCanvas.getContext("2d");
 
-    // خلفية بيضاء
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
     const logo = new Image();
-
     logo.onload = function(){
-      // الشعار
       const logoSize = 85;
       const logoX = (canvasWidth - logoSize) / 2;
 
@@ -2788,7 +2722,6 @@ async function downloadPersonQR(personId){
       ctx.font = "bold 24px Tahoma, Arial, sans-serif";
       ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
 
-      // QR في المنتصف
       const qrX = (canvasWidth - qrSize) / 2;
       ctx.drawImage(qrCanvas, qrX, headerHeight);
 
@@ -2800,12 +2733,10 @@ async function downloadPersonQR(personId){
     };
 
     logo.src = "logo.png";
-
   }, 500);
 }
 
 async function sharePersonQRWithWhatsApp(personId){
-
   const person = people.find(p => String(p.id) === String(personId));
   if(!person){
     toast("لم يتم العثور على التصريح", false);
@@ -2822,23 +2753,11 @@ async function sharePersonQRWithWhatsApp(personId){
   const padding = 25;
   const headerHeight = 225;
 
-  // 1) جلب token من Edge function
-  const { data, error } = await supabaseClient.functions.invoke(
-    "get-gate-token",
-    { body: { permitId: person.id } }
-  );
+  const civil = normalizeDigits(person.civilId);
 
-  if(error || !data?.token){
-    toast("تعذر إنشاء QR آمن", false);
-    return;
-  }
-
-  const token = data.token;
-
-  // 2) QR من token فقط
   const qrContainer = document.createElement("div");
   new QRCode(qrContainer, {
-    text: token,  // token فقط
+    text: civil,
     width: qrSize,
     height: qrSize,
     correctLevel: QRCode.CorrectLevel.M
@@ -2858,11 +2777,9 @@ async function sharePersonQRWithWhatsApp(personId){
 
   const ctx = finalCanvas.getContext("2d");
 
-  // خلفية بيضاء
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
 
-  // الشعار
   const logo = new Image();
   await new Promise((resolve, reject) => {
     logo.onload = () => resolve();
@@ -2889,11 +2806,9 @@ async function sharePersonQRWithWhatsApp(personId){
   ctx.font = "bold 24px Tahoma, Arial, sans-serif";
   ctx.fillText(person.name || "بدون اسم", canvasWidth / 2, 185);
 
-  // QR في المنتصف
   const qrX = (canvasWidth - qrSize) / 2;
   ctx.drawImage(qrCanvas, qrX, headerHeight);
 
-  // حول finalCanvas إلى blob ثم File وارسله
   const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, "image/png"));
   if(!blob){
     toast("تعذر تجهيز صورة QR", false);
