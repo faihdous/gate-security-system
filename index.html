@@ -2458,33 +2458,34 @@ async function handleScannedQR(qrText){
     console.log("QR trimmed:", JSON.stringify(token));
     console.log("QR trimmed length:", token.length);
 
-    // جلب access token من نفس الجلسة
-    const sessionData = await supabaseClient.auth.getSession();
-    const accessToken =
-      sessionData?.data?.session?.access_token ||
-      sessionData?.session?.access_token;
+    // جلب access token من نفس الجلسة (اختياري - فقط للتوثيق إن كان edge يحتاجه)
+    let accessToken = null;
+    try{
+      const sessionData = await supabaseClient.auth.getSession();
+      accessToken =
+        sessionData?.data?.session?.access_token ||
+        sessionData?.session?.access_token ||
+        null;
+    }catch(_){}
 
-    console.log("Has accessToken:", !!accessToken);
+    // استدعاء Edge function عبر GET مع token في الرابط
+    // مهم جدًا: لازم يظهر في الـ Network مثل ...verify-gate-token?token=xxxxx
+    const url =
+      `${SUPABASE_URL}/functions/v1/verify-gate-token?token=${encodeURIComponent(token)}`;
 
-    if(!accessToken){
-      stopQRScanner();
-      toast("الرجاء تسجيل الدخول أولًا (لا يوجد Authorization Token)", false);
-      return;
-    }
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {})
+      }
+    });
 
-    // جرّب الاستدعاء للدالة
-    console.log("[QR] invoke verify-gate-token...");
-    const { data, error } = await supabaseClient.functions.invoke(
-      "verify-gate-token",
-      { body: { token } }
-    );
+    const data = await res.json().catch(() => ({}));
 
-    console.log("[QR] invoke result:", { data, error });
-
-    if(error){
+    if(!res.ok){
       stopQRScanner();
       toast(
-        "تعذر التحقق من QR: " + (error.message || JSON.stringify(error)),
+        "تعذر التحقق من QR: " + (data?.error || `HTTP ${res.status}`),
         false
       );
       return;
@@ -2493,7 +2494,8 @@ async function handleScannedQR(qrText){
     const permitId =
       data?.permitId ?? data?.permit_id ?? data?.permitID ?? null;
 
-    console.log("[QR] permitId resolved:", permitId);
+    console.log("verify-gate-token response:", data);
+    console.log("permitId resolved:", permitId);
 
     if(!permitId){
       stopQRScanner();
