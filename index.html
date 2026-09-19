@@ -2657,9 +2657,11 @@ async function printPersonQR(personId){
   $("qrPrintName").textContent = person.name || "";
   $("qrPrintCode").innerHTML = "";
 
-  // QR من الرقم المدني مباشرة
+  // خلي QR يشفّر آخر 5 أرقام مثل الواتساب
+  const last5 = getLastFive(person.civilId);
+
   new QRCode($("qrPrintCode"), {
-    text: normalizeDigits(person.civilId), // <-- مدني بدل token
+    text: last5,
     width: 132,
     height: 132,
     correctLevel: QRCode.CorrectLevel.M
@@ -2667,6 +2669,7 @@ async function printPersonQR(personId){
 
   setTimeout(() => window.print(), 300);
 }
+
 
 async function downloadPersonQR(personId){
 
