@@ -1544,9 +1544,8 @@ async function loadLogsFromSupabase(){
   const { data, error } = await supabaseClient
     .from("gate_logs")
     .select("*")
-    .order("created_at", { ascending: false });
-
-  console.log("gate_logs count:", (data || []).length, data?.[0]);
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if(error){
     console.error("خطأ تحميل السجلات:", error);
@@ -1556,6 +1555,7 @@ async function loadLogsFromSupabase(){
 
   logs = (data || []).map(dbToLog);
 }
+
 
 
 async function loadAllData(){
@@ -1840,6 +1840,7 @@ if (sessionUser.role !== loginType) {
 
 
 async function logout(){
+  stopSecurityPolling(); // ✅
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
@@ -3295,6 +3296,34 @@ ${m}`;
   );
 }
 
+  let securityPollTimer = null;
+
+function startSecurityPolling() {
+  // إذا كان مشغّل لا نكرر
+  if (securityPollTimer) return;
+
+  securityPollTimer = setInterval(async () => {
+    try {
+      // نحدث السجلات من Supabase
+      await loadLogsFromSupabase();
+
+      // ثم نحدّث العرض في صفحة الأمن
+      if (!$("securityPage").classList.contains("hidden")) {
+        refreshSecurity();
+      }
+    } catch (e) {
+      console.error("Polling error:", e);
+    }
+  }, 5000); // كل 5 ثواني
+}
+
+function stopSecurityPolling() {
+  if (securityPollTimer) {
+    clearInterval(securityPollTimer);
+    securityPollTimer = null;
+  }
+}
+
 async function initialize() {
   await loadAllData();
 
@@ -3313,8 +3342,10 @@ async function initialize() {
       currentSecurityUser.username;
 
     refreshSecurity();
+startSecurityPolling(); // ✅ شغّل التحديث الدوري لصفحة الأمن
 startRealtime();
 return;
+
 
   }
 
