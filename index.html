@@ -1398,6 +1398,37 @@ const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
+// ===== Realtime: استماع لتغيرات gate_logs =====
+let realtimeStarted = false;
+
+function startRealtime() {
+  if (realtimeStarted) return;
+  realtimeStarted = true;
+
+  const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
+
+  realtimeChannel
+    .on(
+      "postgres_changes",
+      {
+        event: "*", // INSERT + UPDATE + DELETE
+        schema: "public",
+        table: "gate_logs"
+      },
+      async () => {
+        // حدّث السجلات من السيرفر ثم حدّث الواجهات
+        await loadLogsFromSupabase();
+
+        if (!$("securityPage").classList.contains("hidden")) {
+          refreshSecurity();
+        }
+        if (!$("adminPage").classList.contains("hidden")) {
+          await renderAdminPage();
+        }
+      }
+    )
+    .subscribe();
+}
 
 const LOGIN_USERS = {
   S1: {
@@ -3341,7 +3372,9 @@ async function initialize() {
       currentSecurityUser.username;
 
     refreshSecurity();
-    return;
+startRealtime();
+return;
+
   }
 
   const permitsSession =
@@ -3381,7 +3414,9 @@ async function initialize() {
       adminUser.username;
 
     await renderAdminPage();
-    return;
+startRealtime();
+return;
+
   }
 }
 function saveFields(){
