@@ -1683,7 +1683,7 @@ async function deleteIndividualLog(logId){
     `تم حذف تقرير الرقم المدني: ${log.civilId || "-"} والاسم: ${log.name || "-"}`
   );
 
-  renderAdminPage();
+  await renderAdminPage();
   toast("تم حذف سجل الشخص بنجاح");
 }
 
@@ -1719,7 +1719,7 @@ await addAudit(
 
 
   if(!$("adminPage").classList.contains("hidden")){
-    renderAdminPage();
+    await renderAdminPage();
   }
 
   if(!$("securityPage").classList.contains("hidden")){
@@ -1862,7 +1862,7 @@ if (sessionUser.role !== loginType) {
     ).textContent =
       "مستخدم الإدارة: " + sessionUser.username;
 
-    renderAdminPage();
+    await renderAdminPage();
   }
 });
 
@@ -2196,10 +2196,15 @@ async function entry(){
     reason: ""
   });
 
-  if(result){
-    refreshSecurity();
-    toast("تم تسجيل الدخول بنجاح");
+ if(result){
+  refreshSecurity();
+
+  if(!($("adminPage").classList.contains("hidden"))){
+    await renderAdminPage();
   }
+
+  toast("تم تسجيل الدخول بنجاح");
+ }
 }
 
 async function exit(){
@@ -2214,16 +2219,13 @@ async function exit(){
     return toast("لا يوجد دخول مفتوح", false);
   }
 
-  const user = await supabaseClient.auth.getUser();
   const exitTime = new Date().toISOString();
 
   const { error } = await supabaseClient
     .from("gate_logs")
     .update({
       exit_time: exitTime,
-      exit_security_user:
-  currentSecurityUser?.username || "غير محدد"
-
+      exit_security_user: currentSecurityUser?.username || "غير محدد"
     })
     .eq("id", l.id);
 
@@ -2233,23 +2235,21 @@ async function exit(){
   }
 
   l.exitTime = exitTime;
-  l.exitTimeText = new Date(exitTime)
-    .toLocaleTimeString("ar-KW");
-
-  l.exitSecurityUser =
-  currentSecurityUser?.username || "غير محدد";
-
+  l.exitTimeText = new Date(exitTime).toLocaleTimeString("ar-KW");
+  l.exitSecurityUser = currentSecurityUser?.username || "غير محدد";
 
   refreshSecurity();
+
+  if(!($("adminPage").classList.contains("hidden"))){
+    await renderAdminPage();
+  }
+
   toast("تم تسجيل الخروج بنجاح");
 }
 
-async function reject(){
-  let r = prompt(
-    "اكتب سبب رفض الدخول:",
-    "التصريح غير مستوفٍ"
-  );
 
+async function reject(){
+  let r = prompt("اكتب سبب رفض الدخول:", "التصريح غير مستوفٍ");
   if(r === null) return;
 
   const result = await addLog({
@@ -2262,9 +2262,15 @@ async function reject(){
 
   if(result){
     refreshSecurity();
+
+    if(!($("adminPage").classList.contains("hidden"))){
+      await renderAdminPage();
+    }
+
     toast("تم تسجيل رفض الدخول");
   }
 }
+
 
 async function unknownReject(c){
   const result = await addLog({
@@ -2277,9 +2283,15 @@ async function unknownReject(c){
 
   if(result){
     refreshSecurity();
+
+    if(!($("adminPage").classList.contains("hidden"))){
+      await renderAdminPage();
+    }
+
     toast("تم تسجيل المحاولة المرفوضة");
   }
 }
+
 
 function refreshSecurity(){updateSecurity();renderLogs();if(currentPerson)renderPerson(currentPerson)}
 function updateSecurity(){$("totalPeople").textContent=people.length;$("activePermits").textContent=people.filter(p=>status(p).allowed).length;$("insideCount").textContent=logs.filter(l=>l.date===localDateKey()&&l.type==="دخول"&&!l.exitTime).length;$("todayLogs").textContent=logs.filter(l=>l.date===localDateKey()).length}
@@ -2901,28 +2913,24 @@ function saveQRImage(canvas, personName){
 }
 
 function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
-function renderAdminPage(){
+async function renderAdminPage(){
   let e = logs.filter(l => l.type === "دخول").length;
   let x = logs.filter(l => l.exitTime).length;
-  let r = logs.filter(l =>
-  ["مرفوض", "rejected", "رفض"].includes(
-    String(l.status || "").trim().toLowerCase()
-  )
-).length;
+  let r = logs.filter(l => ["مرفوض", "rejected", "رفض"].includes(String(l.status||"").trim().toLowerCase())).length;
 
-  let t = logs.filter(
-    l => l.date === localDateKey() && l.type === "دخول"
-  ).length;
+  let t = logs.filter(l => l.date === localDateKey() && l.type === "دخول").length;
 
   $("adminTotalEntries").textContent = e;
   $("adminTotalExits").textContent = x;
   $("adminTotalRejected").textContent = r;
   $("adminTodayEntries").textContent = t;
 
-  renderAdminLogs();
-  showInsidePeople();
-  renderAuditLogs();
+  renderAdminLogs();     // هذا يعتمد على logs المحليّة فقط
+  showInsidePeople();    // يعتمد على logs المحليّة فقط
+
+  await renderAuditLogs(); // هذا يعتمد على Supabase ويحتاج await
 }
+
 function showAdminStatDetails(type){
 
   let title = "";
@@ -3372,7 +3380,7 @@ async function initialize() {
       "مستخدم الإدارة: " +
       adminUser.username;
 
-    renderAdminPage();
+    await renderAdminPage();
     return;
   }
 }
