@@ -3305,14 +3305,15 @@ function startSecurityPolling() {
     try {
       await loadLogsFromSupabase();
 
+      // تحديث صفحة الأمن
       if (!$("securityPage").classList.contains("hidden")) {
-        refreshSecurity(); // يحدّث الأمن
+        refreshSecurity();
       }
 
+      // تحديث صفحة الإدارة
       if (!$("adminPage").classList.contains("hidden")) {
-        await renderAdminPage(); // ✅ يحدّث الإدارة
+        await renderAdminPage();
       }
-
     } catch (e) {
       console.error("Polling error:", e);
     }
