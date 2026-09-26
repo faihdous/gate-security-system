@@ -1546,6 +1546,8 @@ async function loadLogsFromSupabase(){
     .select("*")
     .order("created_at", { ascending: false });
 
+  console.log("gate_logs count:", (data || []).length, data?.[0]);
+
   if(error){
     console.error("خطأ تحميل السجلات:", error);
     toast("تعذر تحميل السجلات من Supabase", false);
@@ -1554,6 +1556,7 @@ async function loadLogsFromSupabase(){
 
   logs = (data || []).map(dbToLog);
 }
+
 
 async function loadAllData(){
   await Promise.all([
