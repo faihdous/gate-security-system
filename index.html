@@ -3298,24 +3298,29 @@ ${m}`;
 
   let securityPollTimer = null;
 
+let securityPollTimer = null;
+
 function startSecurityPolling() {
-  // إذا كان مشغّل لا نكرر
   if (securityPollTimer) return;
 
   securityPollTimer = setInterval(async () => {
     try {
-      // نحدث السجلات من Supabase
       await loadLogsFromSupabase();
 
-      // ثم نحدّث العرض في صفحة الأمن
       if (!$("securityPage").classList.contains("hidden")) {
-        refreshSecurity();
+        refreshSecurity(); // يحدّث الأمن
       }
+
+      if (!$("adminPage").classList.contains("hidden")) {
+        await renderAdminPage(); // ✅ يحدّث الإدارة
+      }
+
     } catch (e) {
       console.error("Polling error:", e);
     }
-  }, 5000); // كل 5 ثواني
+  }, 5000);
 }
+
 
 function stopSecurityPolling() {
   if (securityPollTimer) {
