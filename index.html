@@ -3376,24 +3376,20 @@ return;
   const adminSession =
     sessionStorage.getItem("gateAdminUser");
 
-  if (adminSession) {
-    const adminUser =
-      JSON.parse(adminSession);
+ if (adminSession) {
+  const adminUser = JSON.parse(adminSession);
 
-    $("loginPage").classList.add("hidden");
-    $("adminPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("adminPage").classList.remove("hidden");
 
-    document.querySelector(
-      "#adminPage .header-left span"
-    ).textContent =
-      "مستخدم الإدارة: " +
-      adminUser.username;
+  document.querySelector("#adminPage .header-left span")
+    .textContent = "مستخدم الإدارة: " + adminUser.username;
 
-    await renderAdminPage();
-startRealtime();
-return;
+  await renderAdminPage();      // ✅ موجودة عندك
+  startSecurityPolling();      // ✅ أضفها هنا
+  return;
+}
 
-  }
 }
 function saveFields(){
   localStorage.setItem(
