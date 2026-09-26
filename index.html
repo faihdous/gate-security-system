@@ -1408,27 +1408,22 @@ function startRealtime() {
   const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
 
   realtimeChannel
-    .on(
-      "postgres_changes",
-      {
-        event: "*", // INSERT + UPDATE + DELETE
-        schema: "public",
-        table: "gate_logs"
-      },
-      async () => {
-        // حدّث السجلات من السيرفر ثم حدّث الواجهات
-        await loadLogsFromSupabase();
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "gate_logs"
+    },
+    async (payload) => {
+      console.log("Realtime payload:", payload); // ✅ لازم يبين
+      await loadLogsFromSupabase();
+      if (!$("securityPage").classList.contains("hidden")) refreshSecurity();
+      if (!$("adminPage").classList.contains("hidden")) await renderAdminPage();
+    }
+  )
+  .subscribe();
 
-        if (!$("securityPage").classList.contains("hidden")) {
-          refreshSecurity();
-        }
-        if (!$("adminPage").classList.contains("hidden")) {
-          await renderAdminPage();
-        }
-      }
-    )
-    .subscribe();
-}
 
 const LOGIN_USERS = {
   S1: {
