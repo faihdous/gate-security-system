@@ -3350,31 +3350,38 @@ ${m}`;
 
 let securityPollTimer = null;
 
+let pollingRunning = false;
+
 function startSecurityPolling() {
   if (securityPollTimer) return;
 
   securityPollTimer = setInterval(async () => {
-   try {
-  await loadLogsFromSupabase();
+    if (pollingRunning) return;
+    pollingRunning = true;
 
-  // تحديث صفحة الأمن
-  if (!$("securityPage").classList.contains("hidden")) {
-    refreshSecurity();
-  }
+    try {
+      await loadLogsFromSupabase();
 
-  // تحديث صفحة الإدارة
-  if (!$("adminPage").classList.contains("hidden")) {
-    await renderAdminPage();
-  }
+      // تحديث صفحة الأمن
+      if (!$("securityPage").classList.contains("hidden")) {
+        refreshSecurity();
+      }
 
-  // تحديث صفحة التصاريح (مربعات الإحصائيات فقط)
-  if (!$("permitsPage").classList.contains("hidden")) {
-    refreshPermitsStats();
-  }
+      // تحديث صفحة الإدارة
+      if (!$("adminPage").classList.contains("hidden")) {
+        await renderAdminPage();
+      }
 
-} catch (e) {
-  console.error("Polling error:", e);
-}
+      // تحديث صفحة التصاريح بالكامل كل 5 ثواني
+      if (!$("permitsPage").classList.contains("hidden")) {
+        await loadPeopleFromSupabase(); // تحديث people (القائمة والـ QR)
+        renderPermitsPage();          // تحديث الإحصائيات + permitsList + الحقول
+      }
+    } catch (e) {
+      console.error("Polling error:", e);
+    } finally {
+      pollingRunning = false;
+    }
   }, 5000);
 }
 
