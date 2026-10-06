@@ -1871,8 +1871,7 @@ async function logout(){
 
   sessionStorage.removeItem("gateSecurityUser");
   sessionStorage.removeItem("gatePermitsUser");
-sessionStorage.removeItem("gateAdminUser");
-
+  sessionStorage.removeItem("gateAdminUser");
 
   currentSecurityUser = null;
 
@@ -1882,13 +1881,15 @@ sessionStorage.removeItem("gateAdminUser");
   selectLoginType("security");
 }
 
+
 async function permitsLogout(){
+  stopSecurityPolling(); // ✅ مهم جدًا
+
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
   sessionStorage.removeItem("gatePermitsUser");
-sessionStorage.removeItem("gateAdminUser");
-
+  sessionStorage.removeItem("gateAdminUser");
 
   $("permitsPage").classList.add("hidden");
   $("loginPage").classList.remove("hidden");
@@ -1896,19 +1897,22 @@ sessionStorage.removeItem("gateAdminUser");
   selectLoginType("permits");
 }
 
+
 async function adminLogout(){
+  stopSecurityPolling(); // ✅ مهم جدًا
+
   await supabaseClient.auth.signOut();
 
   sessionStorage.removeItem("gateSecurityUser");
   sessionStorage.removeItem("gatePermitsUser");
-sessionStorage.removeItem("gateAdminUser");
-
+  sessionStorage.removeItem("gateAdminUser");
 
   $("adminPage").classList.add("hidden");
   $("loginPage").classList.remove("hidden");
 
   selectLoginType("admin");
 }
+
 
 function status(p){let t=localDateKey();if(!p.permitStart||!p.permitEnd)return{text:"بيانات التصريح ناقصة",css:"warning",allowed:false};if(t<p.permitStart)return{text:"التصريح لم يبدأ",css:"warning",allowed:false};if(t>p.permitEnd)return{text:"التصريح منتهي",css:"expired",allowed:false};return{text:"التصريح فعال",css:"active",allowed:true}}
 function normalizeDigits(value){
@@ -3374,8 +3378,10 @@ function startSecurityPolling() {
 
       // تحديث صفحة التصاريح بالكامل كل 5 ثواني
       if (!$("permitsPage").classList.contains("hidden")) {
+        console.log("PERMITS polling tick ✅");
+
         await loadPeopleFromSupabase(); // تحديث people (القائمة والـ QR)
-        renderPermitsPage();          // تحديث الإحصائيات + permitsList + الحقول
+        renderPermitsPage();           // تحديث الإحصائيات + permitsList + الحقول
       }
     } catch (e) {
       console.error("Polling error:", e);
@@ -3422,21 +3428,21 @@ return;
     sessionStorage.getItem("gatePermitsUser");
 
   if (permitsSession) {
-    const permitsUser =
-      JSON.parse(permitsSession);
+  const permitsUser = JSON.parse(permitsSession);
 
-    $("loginPage").classList.add("hidden");
-    $("permitsPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("permitsPage").classList.remove("hidden");
 
-    document.querySelector(
-      "#permitsPage .header-left span"
-    ).textContent =
-      "مستخدم التصاريح: " +
-      permitsUser.username;
+  document.querySelector(
+    "#permitsPage .header-left span"
+  ).textContent =
+    "مستخدم التصاريح: " + permitsUser.username;
 
-    renderPermitsPage();
-    return;
-  }
+  renderPermitsPage();
+  startSecurityPolling();
+  startRealtime();
+  return;
+}
 
   const adminSession =
     sessionStorage.getItem("gateAdminUser");
