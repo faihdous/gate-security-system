@@ -1225,6 +1225,32 @@ tbody tr:last-child td{
 </header>
 
 <main>
+  <section class="stats" style="margin-bottom:25px">
+  <div class="stat clickable-stat" onclick="showPermitsDetails('entries')">
+    <span>إجمالي عمليات الدخول</span>
+    <strong id="permitsTotalEntries">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showPermitsDetails('exits')">
+    <span>إجمالي عمليات الخروج</span>
+    <strong id="permitsTotalExits">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showPermitsDetails('rejected')">
+    <span>المحاولات المرفوضة</span>
+    <strong id="permitsTotalRejected">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+
+  <div class="stat clickable-stat" onclick="showPermitsDetails('today')">
+    <span>عمليات دخول اليوم</span>
+    <strong id="permitsTodayEntries">0</strong>
+    <small>اضغط لعرض التفاصيل</small>
+  </div>
+</section>
+
 <section class="card">
 <h2>إضافة تصريح جديد</h2>
 <form id="permitForm"><div id="permitFields" class="form-grid"></div><div class="actions"><button class="green">حفظ التصريح</button></div></form>
@@ -2885,7 +2911,13 @@ function saveQRImage(canvas, personName){
   toast("تم حفظ صورة QR بالجهاز");
 }
 
-function renderPermitsPage(){renderPermitFields();renderFields();renderPermitsList()}
+function renderPermitsPage(){
+  renderPermitFields();
+  renderFields();
+  renderPermitsList();
+  refreshPermitsStats();
+}
+
 async function renderAdminPage(){
   let e = logs.filter(l => l.type === "دخول").length;
   let x = logs.filter(l => l.exitTime).length;
@@ -2902,6 +2934,26 @@ async function renderAdminPage(){
   showInsidePeople();    // يعتمد على logs المحليّة فقط
 
   await renderAuditLogs(); // هذا يعتمد على Supabase ويحتاج await
+}
+function refreshPermitsStats(){
+  let e = logs.filter(l => l.type === "دخول").length;
+  let x = logs.filter(l => l.exitTime).length;
+  let r = logs.filter(l => ["مرفوض", "rejected", "رفض"].includes(
+    String(l.status || "").trim().toLowerCase()
+  )).length;
+
+  let t = logs.filter(l => l.date === localDateKey() && l.type === "دخول").length;
+
+  $("permitsTotalEntries").textContent = e;
+  $("permitsTotalExits").textContent = x;
+  $("permitsTotalRejected").textContent = r;
+  $("permitsTodayEntries").textContent = t;
+}
+
+// نفس طريقة الإدارة تماماً باستخدام detailsModal
+function showPermitsDetails(type){
+  refreshPermitsStats();
+  showAdminStatDetails(type); // يستخدم نفس محتوى النافذة الموجودة عندك
 }
 
 function showAdminStatDetails(type){
@@ -3302,21 +3354,27 @@ function startSecurityPolling() {
   if (securityPollTimer) return;
 
   securityPollTimer = setInterval(async () => {
-    try {
-      await loadLogsFromSupabase();
+   try {
+  await loadLogsFromSupabase();
 
-      // تحديث صفحة الأمن
-      if (!$("securityPage").classList.contains("hidden")) {
-        refreshSecurity();
-      }
+  // تحديث صفحة الأمن
+  if (!$("securityPage").classList.contains("hidden")) {
+    refreshSecurity();
+  }
 
-      // تحديث صفحة الإدارة
-      if (!$("adminPage").classList.contains("hidden")) {
-        await renderAdminPage();
-      }
-    } catch (e) {
-      console.error("Polling error:", e);
-    }
+  // تحديث صفحة الإدارة
+  if (!$("adminPage").classList.contains("hidden")) {
+    await renderAdminPage();
+  }
+
+  // تحديث صفحة التصاريح (مربعات الإحصائيات فقط)
+  if (!$("permitsPage").classList.contains("hidden")) {
+    refreshPermitsStats();
+  }
+
+} catch (e) {
+  console.error("Polling error:", e);
+}
   }, 5000);
 }
 
