@@ -1387,8 +1387,37 @@ tbody tr:last-child td{
   <div id="auditLogsTable"></div>
 </section>
 
+<section class="card">
+  <h2>إدارة التصاريح</h2>
+
+  <button class="green" type="button" onclick="showAdminAddPermitPage()">
+    إضافة تصريح جديد
+  </button>
+
+  <p class="hint" style="margin-top:10px;">
+    تعبئة جميع الخصائص ثم حفظ التصريح.
+  </p>
+</section>
+
+<section id="adminAddPermitPage" class="hidden">
+  <section class="card" style="margin-top:0">
+    <h2>إضافة تصريح جديد</h2>
+
+    <form id="adminPermitForm">
+      <div id="adminPermitFields" class="form-grid"></div>
+
+      <div class="actions">
+        <button type="submit" class="green">حفظ التصريح</button>
+        <button type="button" class="gray" onclick="backToAdminHome()">
+          رجوع
+        </button>
+      </div>
+    </form>
+  </section>
+</section>
 
 </main>
+  
 </section>
 
 <div id="detailsModal" class="details-modal hidden">
@@ -2371,32 +2400,82 @@ function renderLogs(){
     </div>
   `;
 }
+function renderPermitFieldsTo(containerId, prefix){
+  $(containerId).innerHTML = activeFields()
+    .map(f => makeInput(f, prefix, ""))
+    .join("");
+}
+
+async function collectPermitFromForm(prefix){
+  let p = {};
+
+  for (let f of allFields()){
+    let el = $(prefix + f.key);
+
+    if (f.type === "file"){
+      p[f.key] = await fileData(el?.files?.[0]);
+    } else {
+      p[f.key] = el?.value?.trim() || "";
+    }
+  }
+
+  return p;
+}
+
+async function savePermitFromPrefix(prefix, successToastText = "تم حفظ التصريح بنجاح"){
+  const p = await collectPermitFromForm(prefix);
+
+  if(!p.civilId || !p.name){
+    toast("الرقم المدني والاسم مطلوبان", false);
+    return false;
+  }
+
+  if(people.some(x => x.civilId === p.civilId)){
+    toast("يوجد تصريح بهذا الرقم المدني", false);
+    return false;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("permits")
+    .insert(permitToDb(p))
+    .select()
+    .single();
+
+  if(error){
+    console.error(error);
+    toast("تعذر حفظ التصريح: " + error.message, false);
+    return false;
+  }
+
+  people.unshift(dbToPermit(data));
+
+  await addAudit(
+    "إضافة تصريح",
+    `تمت إضافة تصريح للرقم المدني: ${p.civilId} والاسم: ${p.name}`
+  );
+
+  toast(successToastText);
+
+  // لو التصاريح ظاهرة فحدثها
+  if(!$("permitsPage").classList.contains("hidden")){
+    renderPermitsPage();
+  }
+
+  return true;
+}
 
 function makeInput(f,prefix,value=""){let id=prefix+f.key;if(f.type==="file")return`<div><label>${esc(f.label)}</label><input id="${id}" type="file" accept="image/*"></div>`;if(f.type==="textarea")return`<div><label>${esc(f.label)}</label><textarea id="${id}">${esc(value)}</textarea></div>`;return`<div><label>${esc(f.label)}</label><input id="${id}" type="${f.type}" value="${esc(value)}" ${f.required?"required":""}></div>`}
 function renderPermitFields(){$("permitFields").innerHTML=activeFields().map(f=>makeInput(f,"new_")).join("")}
 function fileData(f){return new Promise((res,rej)=>{if(!f)return res("");let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
-$("permitForm").addEventListener("submit",async e=>{e.preventDefault();let p={};for(let f of allFields()){let i=$("new_"+f.key);p[f.key]=f.type==="file"?await fileData(i?.files[0]):i?.value.trim()||""}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x.civilId===p.civilId))return toast("يوجد تصريح بهذا الرقم المدني",false);const { data, error } = await supabaseClient
-  .from("permits")
-  .insert(permitToDb(p))
-  .select()
-  .single();
+$("permitForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ok = await savePermitFromPrefix(
+    "new_",
+    "تم حفظ التصريح بنجاح"
+  );
+  if(ok) e.target.reset();
+});
 
-if(error){
-  console.error(error);
-  return toast("تعذر حفظ التصريح: " + error.message, false);
-}
-
-people.unshift(dbToPermit(data));
-
-await addAudit(
-  "إضافة تصريح",
-  `تمت إضافة تصريح للرقم المدني: ${p.civilId} والاسم: ${p.name}`
-);
-
-e.target.reset();
-renderPermitsPage();
-toast("تم حفظ التصريح بنجاح");
-})
   let qrScanner = null;
 let qrScannerRunning = false;
 
@@ -2916,11 +2995,54 @@ function saveQRImage(canvas, personName){
 }
 
 function renderPermitsPage(){
-  renderPermitFields();
+  renderPermitFieldsTo("permitFields", "new_");
   renderFields();
   renderPermitsList();
   refreshPermitsStats();
 }
+
+  function showAdminAddPermitPage(){
+  // نخفي كل sections داخل adminPage ما عدا صفحة الإضافة
+  document.querySelectorAll("#adminPage > main > section").forEach(sec => {
+    if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
+  });
+
+  $("adminAddPermitPage").classList.remove("hidden");
+
+  // جهّز فورم الإضافة
+  renderAdminPermitPageForm();
+}
+
+function backToAdminHome(){
+  // نرجع كل sections الأساسية تظهر
+  document.querySelectorAll("#adminPage > main > section").forEach(sec => {
+    if(sec.id !== "adminAddPermitPage") sec.classList.remove("hidden");
+  });
+
+  $("adminAddPermitPage").classList.add("hidden");
+
+  // تحديث شاشة الإدارة الأساسية
+  renderAdminPage();
+}
+
+function renderAdminPermitPageForm(){
+  renderPermitFieldsTo("adminPermitFields", "admin_new_");
+
+  const form = $("adminPermitForm");
+
+  // مهم: نظهر فقط listener واحد
+  form.onsubmit = null;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const ok = await savePermitFromPrefix("admin_new_", "تم حفظ التصريح بنجاح");
+    if(ok){
+      e.target.reset();
+      backToAdminHome(); // رجوع مباشر بعد الحفظ
+    }
+  }, { once: false });
+}
+
 
 async function renderAdminPage(){
   let e = logs.filter(l => l.type === "دخول").length;
