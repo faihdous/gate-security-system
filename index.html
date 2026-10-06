@@ -3456,10 +3456,13 @@ return;
   document.querySelector("#adminPage .header-left span")
     .textContent = "مستخدم الإدارة: " + adminUser.username;
 
-  await renderAdminPage();      // ✅ موجودة عندك
-  startSecurityPolling();      // ✅ أضفها هنا
+  await renderAdminPage();
+  startSecurityPolling();
+
+  startRealtime(); // ✅ أضف هذا
   return;
 }
+
 
 }
 function saveFields(){
