@@ -3752,24 +3752,58 @@ function ensureRunning(){
 
 
 async function initialize() {
+
+  const securitySession =
+    sessionStorage.getItem("gateSecurityUser");
+
+  if (securitySession) {
+    currentSecurityUser = JSON.parse(securitySession);
+
+    $("loginPage").classList.add("hidden");
+    $("securityPage").classList.remove("hidden");
+
+    $("securityUserName").textContent =
+      "مستخدم الأمن: " + currentSecurityUser.username;
+
+    refreshSecurity();
+    ensureRunning();
+    return;
+  }
+
   const permitsSession =
     sessionStorage.getItem("gatePermitsUser");
 
   if (permitsSession) {
-  const permitsUser = JSON.parse(permitsSession);
+    const permitsUser = JSON.parse(permitsSession);
 
-  $("loginPage").classList.add("hidden");
-  $("permitsPage").classList.remove("hidden");
+    $("loginPage").classList.add("hidden");
+    $("permitsPage").classList.remove("hidden");
 
-  document.querySelector(
-    "#permitsPage .header-left span"
-  ).textContent =
-    "مستخدم التصاريح: " + permitsUser.username;
+    document.querySelector(
+      "#permitsPage .header-left span"
+    ).textContent = "مستخدم التصاريح: " + permitsUser.username;
 
-  renderPermitsPage();
-ensureRunning();
-return;
+    renderPermitsPage();
+    ensureRunning();
+    return;
+  }
 
+  const adminSession =
+    sessionStorage.getItem("gateAdminUser");
+
+  if (adminSession) {
+    const adminUser = JSON.parse(adminSession);
+
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
+
+    document.querySelector("#adminPage .header-left span")
+      .textContent = "مستخدم الإدارة: " + adminUser.username;
+
+    await renderAdminPage();
+    ensureRunning();
+    return;
+  }
 }
 
   const adminSession =
