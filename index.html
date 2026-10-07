@@ -3723,22 +3723,14 @@ console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("deta
           hideAdminEditBox(); // اختياري: يمنع تعارض مع التعديل المفتوح
         }
 
-        // 3) نافذة تفاصيل العمليات (detailsModal) لو مفتوحة
-        if (!$("detailsModal").classList.contains("hidden")) {
-          // الحل الأسهل: أغلقها ثم أعِد فتحها بنفس آخر نوع تفاصيل (إذا نعرفه)
-          // لكن حالياً كودك لا يحفظ "نوع" التفاصيل.
-          // لذلك نستخدم fallback: إعادة render للـ content على أساس آخر فلترة موجودة في الجدول.
+       if (!$("detailsModal").classList.contains("hidden")) {
+  if (window.__lastAdminDetailsType) {
+    showAdminStatDetails(window.__lastAdminDetailsType);
+  } else {
+    showAdminStatDetails("today");
+  }
+}
 
-          // سنضيف متغير عالمي لتخزين آخر نوع تم فتحه:
-          // (نفّذناه في الخطوة التالية)
-          if (window.__lastAdminDetailsType) {
-            showAdminStatDetails(window.__lastAdminDetailsType);
-          } else {
-            // لو ما عندنا نوع، على الأقل نحدّث الجدول الحالي عبر إعادة فتح آخر state غير ممكن بدقة
-            // لذلك نعيد فتح "today" كخيار افتراضي
-            showAdminStatDetails("today");
-          }
-        }
 
         // 4) تحديث سجل التدقيق (Audit)
         // إذا كنت تحتاجه أيضاً يظهر فوري:
