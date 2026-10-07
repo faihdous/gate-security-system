@@ -3058,10 +3058,12 @@ function hideAdminEditBox(){
 }
 
 function startAdminEdit(civilId){
-  civilId = String(civilId ?? "").trim(); // ✅ تأكيد
+  console.log("startAdminEdit called with:", civilId); // ✅
+  civilId = String(civilId ?? "").trim();
 
   const p = people.find(x => String(x.civilId) === civilId);
   if(!p){
+    console.log("No permit found for:", civilId, "people sample:", people[0]);
     toast("لم يتم العثور على تصريح للتعديل: " + civilId, false);
     return;
   }
