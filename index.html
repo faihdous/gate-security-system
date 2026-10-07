@@ -3137,7 +3137,8 @@ function renderAdminPermitsCurrentList(){
                   </td>
 
                   <td>
-                    <button class="orange" onclick="startAdminEdit('${esc(p.civilId)}')">تعديل</button>
+                   <button class="orange" onclick="startAdminEdit('${String(p.civilId).replace(/'/g,"\\'")}')">تعديل</button>
+
                   </td>
                 </tr>
               `;
