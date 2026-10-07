@@ -2637,6 +2637,47 @@ await addAudit(
   renderPermitsPage();
   toast("تم إلغاء التصريح");
 }
+async function adminCancelPermitByCivilId(civilId){
+  civilId = String(civilId ?? "").trim();
+  if(!civilId) return;
+
+  const p = people.find(x => String(x.civilId) === civilId);
+  if(!p){
+    toast("لم يتم العثور على تصريح", false);
+    return;
+  }
+
+  if(!confirm(
+    "هل أنت متأكد من إلغاء التصريح؟\n\n" +
+    "الاسم: " + (p.name || "-") + "\n" +
+    "الرقم المدني: " + p.civilId
+  )){
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("permits")
+    .update({ is_active: false })
+    .eq("id", p.id);
+
+  if(error){
+    console.error(error);
+    toast("تعذر إلغاء التصريح: " + error.message, false);
+    return;
+  }
+
+  people = people.filter(x => String(x.id) !== String(p.id));
+
+  await addAudit(
+    "إلغاء تصريح",
+    `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
+  );
+
+  renderAdminPermitsCurrentList();
+  hideAdminEditBox();
+
+  toast("تم إلغاء التصريح بنجاح");
+}
 
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
@@ -3125,19 +3166,28 @@ function renderAdminPermitsCurrentList(){
                   <td><span class="status ${s.css}">${s.text}</span></td>
 
                   <td>
-                    ${
-                      s.allowed
-                        ? `
-                          <button class="green" onclick="printPersonQR('${p.id}')">عرض/طباعة QR</button>
-                          <button class="orange" onclick="downloadPersonQR('${p.id}')">حفظ QR</button>
-                        `
-                        : `<button class="gray" disabled>غير فعال</button>`
-                    }
-                  </td>
+  ${
+    s.allowed
+      ? `
+        <button class="green" onclick="printPersonQR('${p.id}')">عرض/طباعة QR</button>
+        <button class="orange" onclick="sharePersonQRWithWhatsApp('${p.id}')">إرسال QR WhatsApp</button>
+        <button class="orange" onclick="downloadPersonQR('${p.id}')">حفظ QR</button>
+      `
+      : `<button class="gray" disabled>غير فعال</button>`
+  }
+</td>
+
 
                  <td>
-  <button class="orange" onclick="startAdminEdit('${String(p.civilId)}')">تعديل</button>
+  <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+    <button class="red" onclick="adminCancelPermitByCivilId('${esc(p.civilId)}')">
+      إلغاء التصريح
+    </button>
+
+    <button class="orange" onclick="startAdminEdit('${String(p.civilId)}')">تعديل</button>
+  </div>
 </td>
+
 
                 </tr>
               `;
