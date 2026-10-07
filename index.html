@@ -3058,9 +3058,11 @@ function hideAdminEditBox(){
 }
 
 function startAdminEdit(civilId){
-  const p = people.find(x => x.civilId === civilId);
+  civilId = String(civilId ?? "").trim(); // ✅ تأكيد
+
+  const p = people.find(x => String(x.civilId) === civilId);
   if(!p){
-    toast("لم يتم العثور على تصريح للتعديل", false);
+    toast("لم يتم العثور على تصريح للتعديل: " + civilId, false);
     return;
   }
 
@@ -3136,10 +3138,10 @@ function renderAdminPermitsCurrentList(){
                     }
                   </td>
 
-                  <td>
-                   <button class="orange" onclick="startAdminEdit('${String(p.civilId).replace(/'/g,"\\'")}')">تعديل</button>
+                 <td>
+  <button class="orange" onclick="startAdminEdit('${String(p.civilId)}')">تعديل</button>
+</td>
 
-                  </td>
                 </tr>
               `;
             }).join("")}
