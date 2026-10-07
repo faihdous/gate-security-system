@@ -1473,51 +1473,38 @@ function startRealtime() {
   if (realtimeStarted) return;
   realtimeStarted = true;
 
-  // ===== Realtime: استماع لتغيرات gate_logs (دخول/خروج) =====
-const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
+  const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
 
-realtimeChannel
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "gate_logs" },
-    async () => {
-      try {
+  realtimeChannel
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "gate_logs",
+      },
+      async () => {
         console.log("Realtime: gate_logs changed");
 
-        // 1) حمّل السجلات الجديدة (لأجل العدّ + الجداول)
         await loadLogsFromSupabase();
 
-        // 2) تحديث صفحة الأمن (لو هي ظاهرة)
         if (!$("securityPage").classList.contains("hidden")) {
           refreshSecurity();
         }
 
-        // 3) تحديث صفحة الإدارة (لو هي ظاهرة)
         if (!$("adminPage").classList.contains("hidden")) {
-          // تحديث الأرقام
           refreshAdminBoxes();
 
-          // تحديث جدول اليوم والموجودين داخل المبنى
-          // (حتى أثناء إضافة/تعديل تصريح نخلي التحديث شغال عشان ما يصير "ما صار التحديث")
-          renderAdminLogs();
-          showInsidePeople();
-
-          // تحديث نافذة التفاصيل لو كانت مفتوحة
-          if (!$("detailsModal").classList.contains("hidden")) {
-            const t = window.__lastAdminDetailsType || "today";
-            showAdminStatDetails(t);
+          // فقط إذا أنت في صفحة الإدارة الرئيسية
+          if ($("adminAddPermitPage").classList.contains("hidden")) {
+            await renderAdminPage();
+            await renderAuditLogs(); // إذا تبغى تتحدث أيضًا هنا
           }
-
-          // Audit logs (إذا تبيها تتحدث تلقائيًا)
-          await renderAuditLogs();
         }
-      } catch (e) {
-        console.error("Realtime handler error:", e);
       }
-    }
-  )
-  .subscribe();
-
+    )
+    .subscribe();
+}
 
 
 const BASE_FIELDS=[
@@ -3307,7 +3294,7 @@ function showPermitsDetails(type){
 }
 
 function showAdminStatDetails(type){
- window.__lastAdminDetailsType = type;
+
   let title = "";
   let filteredLogs = [];
 
