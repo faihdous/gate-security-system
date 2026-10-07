@@ -3697,21 +3697,27 @@ function startSecurityPolling() {
     pollingRunning = true;
 
     try {
+      console.log("Polling tick...");
+
       await loadLogsFromSupabase();
+
+      console.log("Polling logs count:", logs.length);
 
       if (!$("securityPage").classList.contains("hidden")) {
         refreshSecurity();
       }
 
-     if (!$("adminPage").classList.contains("hidden")) {
-  refreshAdminBoxes(); // ✅ الصناديق تتحدث
+      if (!$("adminPage").classList.contains("hidden")) {
+        refreshAdminBoxes();
+        console.log("Admin visible. adminAddPermitPage hidden?",
+          $("adminAddPermitPage").classList.contains("hidden")
+        );
 
-  if ($("adminAddPermitPage").classList.contains("hidden")) {
-    await renderAdminPage();
-    await renderAuditLogs();
-  }
-}
-
+        if ($("adminAddPermitPage").classList.contains("hidden")) {
+          await renderAdminPage();
+          await renderAuditLogs();
+        }
+      }
 
       if (!$("permitsPage").classList.contains("hidden")) {
         await loadPeopleFromSupabase();
@@ -3724,6 +3730,7 @@ function startSecurityPolling() {
     }
   }, 5000);
 }
+
 
 function stopSecurityPolling() {
   if (securityPollTimer) {
