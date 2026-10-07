@@ -3664,38 +3664,42 @@ let securityPollTimer = null;
 let pollingRunning = false;
 
 function startSecurityPolling() {
+  let securityPollTimer = null;
+let pollingRunning = false;
+
+function startSecurityPolling() {
   if (securityPollTimer) return;
 
   securityPollTimer = setInterval(async () => {
     if (pollingRunning) return;
     pollingRunning = true;
 
-    try {
-      await loadLogsFromSupabase();
+    const t = new Date().toLocaleTimeString("ar-KW");
+    console.log("⏳ Security polling tick:", t);
 
-      // تحديث صفحة الأمن
+    try {
+      const beforeCount = logs?.length || 0;
+
+      await loadLogsFromSupabase();
+      console.log("✅ Logs reloaded. before:", beforeCount, "after:", logs?.length);
+
       if (!$("securityPage").classList.contains("hidden")) {
+        console.log("🔒 Updating security page...");
         refreshSecurity();
       }
 
-      // تحديث صفحة الإدارة (كل شيء)
-if (!$("adminPage").classList.contains("hidden")) {
-  // تحديث الأرقام + جدول تفاصيل عمليات اليوم (يعتمد على logs المحليّة)
-  await renderAdminPage();
+      if (!$("adminPage").classList.contains("hidden")) {
+        console.log("🛠️ Updating admin page (numbers + today logs + audit)...");
+        await renderAdminPage();
+      }
 
-  // تحديث سجل التعديلات (يعتمد على Supabase مباشرة)
-  await renderAuditLogs();
-}
-
-      // تحديث صفحة التصاريح بالكامل كل 5 ثواني
       if (!$("permitsPage").classList.contains("hidden")) {
-        console.log("PERMITS polling tick ✅");
-
-        await loadPeopleFromSupabase(); // تحديث people (القائمة والـ QR)
-        renderPermitsPage();           // تحديث الإحصائيات + permitsList + الحقول
+        console.log("🪪 Updating permits page...");
+        await loadPeopleFromSupabase();
+        renderPermitsPage();
       }
     } catch (e) {
-      console.error("Polling error:", e);
+      console.error("❌ Polling error:", e);
     } finally {
       pollingRunning = false;
     }
