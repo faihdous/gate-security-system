@@ -3294,6 +3294,7 @@ function showPermitsDetails(type){
 }
 
 function showAdminStatDetails(type){
+window.__lastAdminDetailsType = type;
 
   let title = "";
   let filteredLogs = [];
@@ -3697,26 +3698,58 @@ function startSecurityPolling() {
     pollingRunning = true;
 
     try {
+      // حدث أحدث سجلات
       await loadLogsFromSupabase();
 
+      // 1) صفحة الأمن (إن كانت ظاهرة)
       if (!$("securityPage").classList.contains("hidden")) {
         refreshSecurity();
       }
 
-     if (!$("adminPage").classList.contains("hidden")) {
-  refreshAdminBoxes(); // ✅ الصناديق تتحدث
+      // 2) صفحة الإدارة (إن كانت ظاهرة)
+      if (!$("adminPage").classList.contains("hidden")) {
+        // تحديث الصناديق + الجداول الأساسية
+        refreshAdminBoxes();
+        renderAdminLogs();
+        showInsidePeople();
+        
+        // إذا كنت داخل "إضافة تصريح جديد"
+        // (هذه الصفحة تعتبر داخل adminPage، لذلك نحدّث فوراً list الخاصة بالتصاريح)
+        if (!$("adminAddPermitPage").classList.contains("hidden")) {
+          await loadPeopleFromSupabase();
+          renderPermitsPage(); // تحديث أي تصاريح لو تستخدم نفس المنطق
+          renderAdminPermitsCurrentList(); // تحديث قائمة تصاريح الإدارة
+          hideAdminEditBox(); // اختياري: يمنع تعارض مع التعديل المفتوح
+        }
 
-  if ($("adminAddPermitPage").classList.contains("hidden")) {
-    await renderAdminPage();
-    await renderAuditLogs();
-  }
-}
+        // 3) نافذة تفاصيل العمليات (detailsModal) لو مفتوحة
+        if (!$("detailsModal").classList.contains("hidden")) {
+          // الحل الأسهل: أغلقها ثم أعِد فتحها بنفس آخر نوع تفاصيل (إذا نعرفه)
+          // لكن حالياً كودك لا يحفظ "نوع" التفاصيل.
+          // لذلك نستخدم fallback: إعادة render للـ content على أساس آخر فلترة موجودة في الجدول.
 
+          // سنضيف متغير عالمي لتخزين آخر نوع تم فتحه:
+          // (نفّذناه في الخطوة التالية)
+          if (window.__lastAdminDetailsType) {
+            showAdminStatDetails(window.__lastAdminDetailsType);
+          } else {
+            // لو ما عندنا نوع، على الأقل نحدّث الجدول الحالي عبر إعادة فتح آخر state غير ممكن بدقة
+            // لذلك نعيد فتح "today" كخيار افتراضي
+            showAdminStatDetails("today");
+          }
+        }
 
+        // 4) تحديث سجل التدقيق (Audit)
+        // إذا كنت تحتاجه أيضاً يظهر فوري:
+        await renderAuditLogs();
+      }
+
+      // 5) صفحة التصاريح (إن كانت ظاهرة)
       if (!$("permitsPage").classList.contains("hidden")) {
         await loadPeopleFromSupabase();
         renderPermitsPage();
       }
+
     } catch (e) {
       console.error("Polling error:", e);
     } finally {
@@ -3724,6 +3757,7 @@ function startSecurityPolling() {
     }
   }, 2000);
 }
+
 
 function stopSecurityPolling() {
   if (securityPollTimer) {
