@@ -3678,10 +3678,14 @@ function startSecurityPolling() {
         refreshSecurity();
       }
 
-      // تحديث صفحة الإدارة
-      if (!$("adminPage").classList.contains("hidden")) {
-        await renderAdminPage();
-      }
+      // تحديث صفحة الإدارة (كل شيء)
+if (!$("adminPage").classList.contains("hidden")) {
+  // تحديث الأرقام + جدول تفاصيل عمليات اليوم (يعتمد على logs المحليّة)
+  await renderAdminPage();
+
+  // تحديث سجل التعديلات (يعتمد على Supabase مباشرة)
+  await renderAuditLogs();
+}
 
       // تحديث صفحة التصاريح بالكامل كل 5 ثواني
       if (!$("permitsPage").classList.contains("hidden")) {
