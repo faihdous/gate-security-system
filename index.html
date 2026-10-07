@@ -3696,6 +3696,7 @@ function startSecurityPolling() {
   securityPollTimer = setInterval(async () => {
     if (pollingRunning) return;
     pollingRunning = true;
+console.log("⏱️ polling tick...");
 
     try {
       console.log("Polling tick...");
@@ -3741,6 +3742,7 @@ function stopSecurityPolling() {
 }
 
 function ensureRunning(){
+  console.log("✅ ensureRunning called");
   startSecurityPolling();
   startRealtime();
 }
@@ -3748,31 +3750,8 @@ function ensureRunning(){
 
 
 
+
 async function initialize() {
-  await loadAllData();
-
-  const securitySession =
-    sessionStorage.getItem("gateSecurityUser");
-
-  if (securitySession) {
-    currentSecurityUser =
-      JSON.parse(securitySession);
-
-    $("loginPage").classList.add("hidden");
-    $("securityPage").classList.remove("hidden");
-
-    $("securityUserName").textContent =
-      "مستخدم الأمن: " +
-      currentSecurityUser.username;
-
-    refreshSecurity();
-ensureRunning();
-return;
-
-
-
-  }
-
   const permitsSession =
     sessionStorage.getItem("gatePermitsUser");
 
