@@ -1476,22 +1476,35 @@ function startRealtime() {
   const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
 
   realtimeChannel
-  .on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "gate_logs"
-    },
-    async (payload) => {
-      console.log("Realtime payload:", payload); // ✅ لازم يبين
-      await loadLogsFromSupabase();
-      if (!$("securityPage").classList.contains("hidden")) refreshSecurity();
-      if (!$("adminPage").classList.contains("hidden")) await renderAdminPage();
-    }
-  )
-  .subscribe();
-} 
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "gate_logs",
+      },
+      async () => {
+        console.log("Realtime: gate_logs changed");
+
+        await loadLogsFromSupabase();
+
+        if (!$("securityPage").classList.contains("hidden")) {
+          refreshSecurity();
+        }
+
+        if (!$("adminPage").classList.contains("hidden")) {
+          refreshAdminBoxes();
+
+          // فقط إذا أنت في صفحة الإدارة الرئيسية
+          if ($("adminAddPermitPage").classList.contains("hidden")) {
+            await renderAdminPage();
+            await renderAuditLogs(); // إذا تبغى تتحدث أيضًا هنا
+          }
+        }
+      }
+    )
+    .subscribe();
+}
 
 
 const BASE_FIELDS=[
@@ -3228,11 +3241,15 @@ function renderAdminPermitPageForm(){
   }, { once: false });
 }
 
-
-async function renderAdminPage(){
+// ====== تحديث صناديق "الإدارة" ======
+function refreshAdminBoxes(){
   let e = logs.filter(l => l.type === "دخول").length;
   let x = logs.filter(l => l.exitTime).length;
-  let r = logs.filter(l => ["مرفوض", "rejected", "رفض"].includes(String(l.status||"").trim().toLowerCase())).length;
+  let r = logs.filter(l =>
+    ["مرفوض", "rejected", "رفض"].includes(
+      String(l.status || "").trim().toLowerCase()
+    )
+  ).length;
 
   let t = logs.filter(l => l.date === localDateKey() && l.type === "دخول").length;
 
@@ -3240,12 +3257,21 @@ async function renderAdminPage(){
   $("adminTotalExits").textContent = x;
   $("adminTotalRejected").textContent = r;
   $("adminTodayEntries").textContent = t;
+}
 
-  renderAdminLogs();     // هذا يعتمد على logs المحليّة فقط
+async function renderAdminPage(){
+  // ✅ تحديث الصناديق دائمًا من logs المحليّة
+  refreshAdminBoxes();
+
+  // تحديث المحتوى
+  renderAdminLogs();     // يعتمد على logs المحليّة فقط
   showInsidePeople();    // يعتمد على logs المحليّة فقط
 
-  await renderAuditLogs(); // هذا يعتمد على Supabase ويحتاج await
+  // تحديث Audit (Supabase)
+  await renderAuditLogs();
 }
+
+// (باقي دوال إحصائيات التصاريح)
 function refreshPermitsStats(){
   let e = logs.filter(l => l.type === "دخول").length;
   let x = logs.filter(l => l.exitTime).length;
@@ -3659,6 +3685,7 @@ ${m}`;
   );
 }
 
+  
 let securityPollTimer = null;
 let pollingRunning = false;
 
@@ -3676,10 +3703,15 @@ function startSecurityPolling() {
         refreshSecurity();
       }
 
-      if (!$("adminPage").classList.contains("hidden")) {
-        await renderAdminPage();
-        await renderAuditLogs();
-      }
+     if (!$("adminPage").classList.contains("hidden")) {
+  refreshAdminBoxes(); // ✅ الصناديق تتحدث
+
+  if ($("adminAddPermitPage").classList.contains("hidden")) {
+    await renderAdminPage();
+    await renderAuditLogs();
+  }
+}
+
 
       if (!$("permitsPage").classList.contains("hidden")) {
         await loadPeopleFromSupabase();
