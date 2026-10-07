@@ -1415,15 +1415,16 @@ tbody tr:last-child td{
       </div>
     </form>
 
-    <!-- التصاريح الحالية (QR + تعديل) -->
-    <div class="document" style="margin-top:18px;border:none;padding:0;background:transparent;box-shadow:none;">
-      <h3 style="margin:0 0 12px;color:var(--blue);font-size:18px">التصاريح الحالية</h3>
-      <div class="hint" style="margin-top:0;">عرض QR + تعديل نفس منطق صفحة التصاريح.</div>
-      <div id="adminPermitsList" class="table-wrapper" style="margin-top:14px;"></div>
-    </div>
+    <!-- مربع التعديل (فوق التصاريح مباشرة) -->
+<div id="adminEditBox" class="edit-box hidden" style="margin-top:0;"></div>
 
-    <!-- مربع التعديل -->
-    <div id="adminEditBox" class="edit-box hidden" style="margin-top:18px;"></div>
+<!-- التصاريح الحالية -->
+<div class="document" style="margin-top:18px;border:none;padding:0;background:transparent;box-shadow:none;">
+  <h3 style="margin:0 0 12px;color:var(--blue);font-size:18px">التصاريح الحالية</h3>
+  <div class="hint" style="margin-top:0;">عرض QR + تعديل نفس منطق صفحة التصاريح.</div>
+  <div id="adminPermitsList" class="table-wrapper" style="margin-top:14px;"></div>
+</div>
+
   </section>
 </section>
 
