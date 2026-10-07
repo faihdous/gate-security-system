@@ -1586,8 +1586,9 @@ function dbToLog(row){
   return {
     id: row.id,
     date: row.created_at
-      ? row.created_at.slice(0,10)
-      : "",
+  ? localDateKey(new Date(row.created_at))
+  : "",
+
     time: row.entry_time || row.created_at || "",
     timeText: row.entry_time
       ? new Date(row.entry_time).toLocaleTimeString("ar-KW")
