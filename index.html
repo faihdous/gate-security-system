@@ -3700,6 +3700,10 @@ function stopSecurityPolling() {
   }
 }
 
+function ensureRunning(){
+  startSecurityPolling();
+  startRealtime();
+}
 
 
 
@@ -3722,9 +3726,9 @@ async function initialize() {
       currentSecurityUser.username;
 
     refreshSecurity();
-startSecurityPolling(); // ✅ شغّل التحديث الدوري لصفحة الأمن
-startRealtime();
+ensureRunning();
 return;
+
 
 
   }
@@ -3744,9 +3748,9 @@ return;
     "مستخدم التصاريح: " + permitsUser.username;
 
   renderPermitsPage();
-  startSecurityPolling();
-  startRealtime();
-  return;
+ensureRunning();
+return;
+
 }
 
   const adminSession =
@@ -3762,10 +3766,10 @@ return;
     .textContent = "مستخدم الإدارة: " + adminUser.username;
 
   await renderAdminPage();
-  startSecurityPolling();
+ensureRunning();
+return;
 
-  startRealtime(); // ✅ أضف هذا
-  return;
+
 }
 
 
