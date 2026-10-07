@@ -1299,7 +1299,20 @@ tbody tr:last-child td{
 <section id="adminPage" class="hidden">
 <header>
 <div class="brand"><img src="logo.png"><div><h2>الصفحة الإدارية</h2><small>إحصائيات الدخول ومتابعة مستخدمي النظام</small></div></div>
-<div class="header-left"><span>مسؤول الإدارة</span><button class="logout" onclick="adminLogout()">تسجيل الخروج</button></div>
+<div class="header-left">
+  <span>مسؤول الإدارة</span>
+
+  <!-- زر إضافة تصريح جديد في الشريط الأزرق -->
+  <button
+    class="green"
+    type="button"
+    onclick="showAdminAddPermitPage()">
+    إضافة تصريح جديد
+  </button>
+
+  <button class="logout" onclick="adminLogout()">تسجيل الخروج</button>
+</div>
+
 </header>
 
 <main>
@@ -1389,10 +1402,6 @@ tbody tr:last-child td{
 
 <section class="card">
   <h2>إدارة التصاريح</h2>
-
-  <button class="green" type="button" onclick="showAdminAddPermitPage()">
-    إضافة تصريح جديد
-  </button>
 
   <p class="hint" style="margin-top:10px;">
     تعبئة جميع الخصائص ثم حفظ التصريح.
