@@ -1430,6 +1430,7 @@ tbody tr:last-child td{
     <div id="adminPermitsList"></div>
   </section>
 </section>
+<div id="adminEditResult"></div>
 
 
 </main>
@@ -2777,13 +2778,15 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
                   <td>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
                      <button class="orange"
-  onclick="editPermitByCivilId(${JSON.stringify(civilId)})">
+  onclick="adminStartEdit(${JSON.stringify(civilId)})"
+
   تعديل
 </button>
 
 <button class="red"
   ${s.allowed ? "" : "disabled"}
-  onclick="cancelPermitByCivilId(${JSON.stringify(civilId)})">
+  onclick="adminCancelPermitByCivilId(${JSON.stringify(civilId)})"
+
   إلغاء التصريح
 </button>
 
@@ -2796,6 +2799,148 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
         </table>
       </div>
     `;
+}
+function adminStartEdit(civilId){
+  const p = people.find(x => x.civilId === civilId);
+
+  if(!p){
+    toast("لم يتم العثور على التصريح", false);
+    return;
+  }
+
+  editingCivilId = civilId;
+
+  $("adminEditResult").innerHTML = `
+    <div class="edit-box">
+      <h3>تعديل تصريح: ${esc(p.name)}</h3>
+
+      <form id="adminEditForm">
+        <div id="adminEditFields" class="form-grid">
+          ${activeFields().map(f => makeInput(f, "admin_edit_", p[f.key])).join("")}
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="green">حفظ التعديلات</button>
+          <button type="button" class="gray" onclick="closeAdminEdit()">إلغاء</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const form = $("adminEditForm");
+
+  // تجنب تكرار listeners
+  form.onsubmit = null;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await adminSaveEdit();
+  }, { once: false });
+}
+function closeAdminEdit(){
+  $("adminEditResult").innerHTML = "";
+  editingCivilId = null;
+}
+async function adminSaveEdit(){
+  const p = people.find(x => x.civilId === editingCivilId);
+  if(!p){
+    toast("تعذر العثور على التصريح", false);
+    return;
+  }
+
+  const oldCivilId = p.civilId;
+
+  for (let f of allFields()){
+    const i = $("admin_edit_" + f.key);
+    if(!i) continue;
+
+    if(f.type === "file"){
+      if(i.files && i.files[0]) p[f.key] = await fileData(i.files[0]);
+    }else{
+      p[f.key] = i.value.trim();
+    }
+  }
+
+  if(!p.civilId || !p.name){
+    toast("الرقم المدني والاسم مطلوبان", false);
+    return;
+  }
+
+  if(people.some(x => x !== p && x.civilId === p.civilId)){
+    toast("الرقم المدني مستخدم في تصريح آخر", false);
+    return;
+  }
+
+  // تحديث أي logs محلية (اختياري، مثل اللي عندك بالـ saveEdit)
+  logs.forEach(l => {
+    if(l.civilId === oldCivilId) l.civilId = p.civilId;
+  });
+
+  const { error } = await supabaseClient
+    .from("permits")
+    .update({
+      civil_id: p.civilId,
+      full_name: p.name,
+      company: p.company || "",
+      job: p.job || "",
+      phone: p.phone || "",
+      permit_start: p.permitStart || null,
+      permit_end: p.permitEnd || null,
+      allowed_area: p.allowedArea || "",
+      card_image_path: p.cardImage || "",
+      notes: p.notes || "",
+      custom_data: p.customData || {},
+      updated_by: (await supabaseClient.auth.getUser()).data.user?.id || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", p.id);
+
+  if(error){
+    console.error(error);
+    toast("تعذر حفظ التعديلات: " + error.message, false);
+    return;
+  }
+
+  await addAudit(
+    "تعديل تصريح",
+    `تم تعديل تصريح الرقم المدني من ${oldCivilId} إلى ${p.civilId} والاسم: ${p.name}`
+  );
+
+  closeAdminEdit();
+  renderPermitsPage(); // تحديث صفحة التصاريح إن كانت مخفية/مفتوحة
+  renderPermitsListTo("adminPermitsList"); // تحديث القائمة داخل الأدمن
+  toast("تم تعديل التصريح بنجاح");
+}
+async function adminCancelPermitByCivilId(civilId){
+  const p = people.find(x => x.civilId === civilId);
+  if(!p){
+    toast("لم يتم العثور على التصريح", false);
+    return;
+  }
+
+  if(!confirm("هل تريد إلغاء هذا التصريح؟")) return;
+
+  const { error } = await supabaseClient
+    .from("permits")
+    .update({ is_active: false })
+    .eq("id", p.id);
+
+  if(error){
+    console.error(error);
+    toast("تعذر إلغاء التصريح: " + error.message, false);
+    return;
+  }
+
+  people = people.filter(x => x.id !== p.id);
+
+  await addAudit(
+    "إلغاء تصريح",
+    `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
+  );
+
+  toast("تم إلغاء التصريح");
+  closeAdminEdit();
+  renderPermitsListTo("adminPermitsList");
+  refreshPermitsStats();
 }
 
 
