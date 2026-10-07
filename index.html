@@ -2776,15 +2776,14 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
 
                   <td>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                      <button class="orange"
-  onclick="editPermitByCivilId(${JSON.stringify(civilId)})"
-
+                     <button class="orange"
+  onclick="editPermitByCivilId(${JSON.stringify(civilId)})">
   تعديل
 </button>
 
 <button class="red"
   ${s.allowed ? "" : "disabled"}
-  onclick="cancelPermitByCivilId('${civilId}')">
+  onclick="cancelPermitByCivilId(${JSON.stringify(civilId)})">
   إلغاء التصريح
 </button>
 
