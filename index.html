@@ -3660,11 +3660,6 @@ ${m}`;
 }
 
 let securityPollTimer = null;
-
-let pollingRunning = false;
-
-function startSecurityPolling() {
-  let securityPollTimer = null;
 let pollingRunning = false;
 
 function startSecurityPolling() {
@@ -3674,38 +3669,29 @@ function startSecurityPolling() {
     if (pollingRunning) return;
     pollingRunning = true;
 
-    const t = new Date().toLocaleTimeString("ar-KW");
-    console.log("⏳ Security polling tick:", t);
-
     try {
-      const beforeCount = logs?.length || 0;
-
       await loadLogsFromSupabase();
-      console.log("✅ Logs reloaded. before:", beforeCount, "after:", logs?.length);
 
       if (!$("securityPage").classList.contains("hidden")) {
-        console.log("🔒 Updating security page...");
         refreshSecurity();
       }
 
       if (!$("adminPage").classList.contains("hidden")) {
-        console.log("🛠️ Updating admin page (numbers + today logs + audit)...");
         await renderAdminPage();
+        await renderAuditLogs();
       }
 
       if (!$("permitsPage").classList.contains("hidden")) {
-        console.log("🪪 Updating permits page...");
         await loadPeopleFromSupabase();
         renderPermitsPage();
       }
     } catch (e) {
-      console.error("❌ Polling error:", e);
+      console.error("Polling error:", e);
     } finally {
       pollingRunning = false;
     }
   }, 5000);
 }
-
 
 function stopSecurityPolling() {
   if (securityPollTimer) {
@@ -3713,6 +3699,10 @@ function stopSecurityPolling() {
     securityPollTimer = null;
   }
 }
+
+
+
+
 
 async function initialize() {
   await loadAllData();
