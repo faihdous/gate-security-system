@@ -1586,9 +1586,8 @@ function dbToLog(row){
   return {
     id: row.id,
     date: row.created_at
-  ? localDateKey(new Date(row.created_at))
-  : "",
-
+      ? row.created_at.slice(0,10)
+      : "",
     time: row.entry_time || row.created_at || "",
     timeText: row.entry_time
       ? new Date(row.entry_time).toLocaleTimeString("ar-KW")
@@ -3696,30 +3695,23 @@ function startSecurityPolling() {
   securityPollTimer = setInterval(async () => {
     if (pollingRunning) return;
     pollingRunning = true;
-console.log("⏱️ polling tick...");
 
     try {
-      console.log("Polling tick...");
-
       await loadLogsFromSupabase();
-
-      console.log("Polling logs count:", logs.length);
 
       if (!$("securityPage").classList.contains("hidden")) {
         refreshSecurity();
       }
 
-      if (!$("adminPage").classList.contains("hidden")) {
-        refreshAdminBoxes();
-        console.log("Admin visible. adminAddPermitPage hidden?",
-          $("adminAddPermitPage").classList.contains("hidden")
-        );
+     if (!$("adminPage").classList.contains("hidden")) {
+  refreshAdminBoxes(); // ✅ الصناديق تتحدث
 
-        if ($("adminAddPermitPage").classList.contains("hidden")) {
-          await renderAdminPage();
-          await renderAuditLogs();
-        }
-      }
+  if ($("adminAddPermitPage").classList.contains("hidden")) {
+    await renderAdminPage();
+    await renderAuditLogs();
+  }
+}
+
 
       if (!$("permitsPage").classList.contains("hidden")) {
         await loadPeopleFromSupabase();
@@ -3733,7 +3725,6 @@ console.log("⏱️ polling tick...");
   }, 5000);
 }
 
-
 function stopSecurityPolling() {
   if (securityPollTimer) {
     clearInterval(securityPollTimer);
@@ -3742,66 +3733,56 @@ function stopSecurityPolling() {
 }
 
 function ensureRunning(){
-  console.log("✅ ensureRunning called");
   startSecurityPolling();
   startRealtime();
 }
 
 
 
+
 async function initialize() {
+  await loadAllData();
 
   const securitySession =
     sessionStorage.getItem("gateSecurityUser");
 
   if (securitySession) {
-    currentSecurityUser = JSON.parse(securitySession);
+    currentSecurityUser =
+      JSON.parse(securitySession);
 
     $("loginPage").classList.add("hidden");
     $("securityPage").classList.remove("hidden");
 
     $("securityUserName").textContent =
-      "مستخدم الأمن: " + currentSecurityUser.username;
+      "مستخدم الأمن: " +
+      currentSecurityUser.username;
 
     refreshSecurity();
-    ensureRunning();
-    return;
+ensureRunning();
+return;
+
+
+
   }
 
   const permitsSession =
     sessionStorage.getItem("gatePermitsUser");
 
   if (permitsSession) {
-    const permitsUser = JSON.parse(permitsSession);
+  const permitsUser = JSON.parse(permitsSession);
 
-    $("loginPage").classList.add("hidden");
-    $("permitsPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("permitsPage").classList.remove("hidden");
 
-    document.querySelector(
-      "#permitsPage .header-left span"
-    ).textContent = "مستخدم التصاريح: " + permitsUser.username;
+  document.querySelector(
+    "#permitsPage .header-left span"
+  ).textContent =
+    "مستخدم التصاريح: " + permitsUser.username;
 
-    renderPermitsPage();
-    ensureRunning();
-    return;
-  }
+  renderPermitsPage();
+ensureRunning();
+return;
 
-  const adminSession =
-    sessionStorage.getItem("gateAdminUser");
-
-  if (adminSession) {
-    const adminUser = JSON.parse(adminSession);
-
-    $("loginPage").classList.add("hidden");
-    $("adminPage").classList.remove("hidden");
-
-    document.querySelector("#adminPage .header-left span")
-      .textContent = "مستخدم الإدارة: " + adminUser.username;
-
-    await renderAdminPage();
-    ensureRunning();
-    return;
-  }
 }
 
   const adminSession =
@@ -3824,6 +3805,7 @@ return;
 }
 
 
+}
 function saveFields(){
   localStorage.setItem(
     "gateCustomFields",
