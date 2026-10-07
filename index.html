@@ -3700,6 +3700,7 @@ function startSecurityPolling() {
     try {
       // حدث أحدث سجلات
       await loadLogsFromSupabase();
+console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("detailsModal").classList.contains("hidden"));
 
       // 1) صفحة الأمن (إن كانت ظاهرة)
       if (!$("securityPage").classList.contains("hidden")) {
@@ -3765,10 +3766,9 @@ function stopSecurityPolling() {
     securityPollTimer = null;
   }
 }
-
 function ensureRunning(){
   startSecurityPolling();
-  startRealtime();
+  // startRealtime(); // مؤقتًا عشان نختبر polling فقط
 }
 
 
