@@ -1473,50 +1473,51 @@ function startRealtime() {
   if (realtimeStarted) return;
   realtimeStarted = true;
 
-  const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
+  // ===== Realtime: استماع لتغيرات gate_logs (دخول/خروج) =====
+const realtimeChannel = supabaseClient.channel("sync_gate_log_columns_trigger");
 
-  realtimeChannel
-    .on(
-  "postgres_changes",
-  { event: "*", schema: "public", table: "gate_logs" },
-  async () => {
-    console.log("Realtime: gate_logs changed");
+realtimeChannel
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "gate_logs" },
+    async () => {
+      try {
+        console.log("Realtime: gate_logs changed");
 
-    // 1) حمّل السجلات الجديدة
-    await loadLogsFromSupabase();
+        // 1) حمّل السجلات الجديدة (لأجل العدّ + الجداول)
+        await loadLogsFromSupabase();
 
-    // 2) تحديث صفحة الأمن (الدخول/الخروج)
-    if (!$("securityPage").classList.contains("hidden")) {
-      refreshSecurity(); // counters + today logs + current person if any
-    }
-
-    // 3) تحديث صفحة الإدارة (الدخول/الخروج)
-    if (!$("adminPage").classList.contains("hidden")) {
-      // إذا أنت في صفحة إضافة/تعديل تصريح لا تُحتاج جداول الحركة الأساسية
-      // (لكن لو تريد تحديثها حتى وقتها أزل هذا الشرط)
-      if ($("adminAddPermitPage").classList.contains("hidden")) {
-        refreshAdminBoxes();   // أرقام
-        renderAdminLogs();     // جدول عمليات اليوم
-        showInsidePeople();    // الموجودين داخل المبنى
-
-        // إذا نافذة تفاصيل العمليات مفتوحة حدثها
-        if (!$("detailsModal").classList.contains("hidden")) {
-          // details تستخدم دوال showAdminStatDetails حسب last type
-          // لذلك نخزن آخر نوع في متغير (انظر الخطوة رقم 2)
-          if (window.__lastAdminDetailsType) {
-            showAdminStatDetails(window.__lastAdminDetailsType);
-          }
+        // 2) تحديث صفحة الأمن (لو هي ظاهرة)
+        if (!$("securityPage").classList.contains("hidden")) {
+          refreshSecurity();
         }
 
-        // Audit logs (اختياري)
-        await renderAuditLogs();
+        // 3) تحديث صفحة الإدارة (لو هي ظاهرة)
+        if (!$("adminPage").classList.contains("hidden")) {
+          // تحديث الأرقام
+          refreshAdminBoxes();
+
+          // تحديث جدول اليوم والموجودين داخل المبنى
+          // (حتى أثناء إضافة/تعديل تصريح نخلي التحديث شغال عشان ما يصير "ما صار التحديث")
+          renderAdminLogs();
+          showInsidePeople();
+
+          // تحديث نافذة التفاصيل لو كانت مفتوحة
+          if (!$("detailsModal").classList.contains("hidden")) {
+            const t = window.__lastAdminDetailsType || "today";
+            showAdminStatDetails(t);
+          }
+
+          // Audit logs (إذا تبيها تتحدث تلقائيًا)
+          await renderAuditLogs();
+        }
+      } catch (e) {
+        console.error("Realtime handler error:", e);
       }
     }
-  }
-)
-.subscribe();
+  )
+  .subscribe();
 
-}
 
 
 const BASE_FIELDS=[
