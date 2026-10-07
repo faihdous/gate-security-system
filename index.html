@@ -1477,33 +1477,45 @@ function startRealtime() {
 
   realtimeChannel
     .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "gate_logs",
-      },
-      async () => {
-        console.log("Realtime: gate_logs changed");
+  "postgres_changes",
+  { event: "*", schema: "public", table: "gate_logs" },
+  async () => {
+    console.log("Realtime: gate_logs changed");
 
-        await loadLogsFromSupabase();
+    // 1) حمّل السجلات الجديدة
+    await loadLogsFromSupabase();
 
-        if (!$("securityPage").classList.contains("hidden")) {
-          refreshSecurity();
-        }
+    // 2) تحديث صفحة الأمن (الدخول/الخروج)
+    if (!$("securityPage").classList.contains("hidden")) {
+      refreshSecurity(); // counters + today logs + current person if any
+    }
 
-        if (!$("adminPage").classList.contains("hidden")) {
-          refreshAdminBoxes();
+    // 3) تحديث صفحة الإدارة (الدخول/الخروج)
+    if (!$("adminPage").classList.contains("hidden")) {
+      // إذا أنت في صفحة إضافة/تعديل تصريح لا تُحتاج جداول الحركة الأساسية
+      // (لكن لو تريد تحديثها حتى وقتها أزل هذا الشرط)
+      if ($("adminAddPermitPage").classList.contains("hidden")) {
+        refreshAdminBoxes();   // أرقام
+        renderAdminLogs();     // جدول عمليات اليوم
+        showInsidePeople();    // الموجودين داخل المبنى
 
-          // فقط إذا أنت في صفحة الإدارة الرئيسية
-          if ($("adminAddPermitPage").classList.contains("hidden")) {
-            await renderAdminPage();
-            await renderAuditLogs(); // إذا تبغى تتحدث أيضًا هنا
+        // إذا نافذة تفاصيل العمليات مفتوحة حدثها
+        if (!$("detailsModal").classList.contains("hidden")) {
+          // details تستخدم دوال showAdminStatDetails حسب last type
+          // لذلك نخزن آخر نوع في متغير (انظر الخطوة رقم 2)
+          if (window.__lastAdminDetailsType) {
+            showAdminStatDetails(window.__lastAdminDetailsType);
           }
         }
+
+        // Audit logs (اختياري)
+        await renderAuditLogs();
       }
-    )
-    .subscribe();
+    }
+  }
+)
+.subscribe();
+
 }
 
 
@@ -3294,7 +3306,7 @@ function showPermitsDetails(type){
 }
 
 function showAdminStatDetails(type){
-
+ window.__lastAdminDetailsType = type;
   let title = "";
   let filteredLogs = [];
 
