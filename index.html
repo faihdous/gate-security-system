@@ -1410,20 +1410,29 @@ tbody tr:last-child td{
 
 <section id="adminAddPermitPage" class="hidden">
   <section class="card" style="margin-top:0">
-    <h2>إضافة تصريح جديد</h2>
+    <h2>إضافة/إدارة التصاريح (الإدارية)</h2>
 
     <form id="adminPermitForm">
       <div id="adminPermitFields" class="form-grid"></div>
 
       <div class="actions">
         <button type="submit" class="green">حفظ التصريح</button>
-        <button type="button" class="gray" onclick="backToAdminHome()">
-          رجوع
-        </button>
+        <button type="button" class="gray" onclick="backToAdminHome()">رجوع</button>
       </div>
     </form>
+
+    <!-- التصاريح الحالية (QR + تعديل) -->
+    <div class="document" style="margin-top:18px;border:none;padding:0;background:transparent;box-shadow:none;">
+      <h3 style="margin:0 0 12px;color:var(--blue);font-size:18px">التصاريح الحالية</h3>
+      <div class="hint" style="margin-top:0;">عرض QR + تعديل نفس منطق صفحة التصاريح.</div>
+      <div id="adminPermitsList" class="table-wrapper" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- مربع التعديل -->
+    <div id="adminEditBox" class="edit-box hidden" style="margin-top:18px;"></div>
   </section>
 </section>
+
 
 </main>
   
@@ -2666,7 +2675,19 @@ await addAudit(
   `تم تعديل تصريح الرقم المدني من ${old} إلى ${p.civilId} والاسم: ${p.name}`
 );
 
-editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
+editingCivilId=null;// تحديث شاشة التصاريح (صفحة التصاريح)
+// وكمان تحديث قائمة الإدارة إذا كنا داخل صفحة الإدارة
+if(!$("permitsPage").classList.contains("hidden")){
+  renderPermitsPage();
+}
+
+if(!$("adminAddPermitPage").classList.contains("hidden")){
+  renderAdminPermitsCurrentList();
+}
+
+hideAdminEditBox();
+toast("تم تعديل التصريح بنجاح");
+}
 function renderPermitsList(){
 
   $("permitsList").innerHTML = !people.length
@@ -3011,7 +3032,6 @@ function renderPermitsPage(){
 }
 
   function showAdminAddPermitPage(){
-  // نخفي كل sections داخل adminPage ما عدا صفحة الإضافة
   document.querySelectorAll("#adminPage > main > section").forEach(sec => {
     if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
   });
@@ -3020,6 +3040,112 @@ function renderPermitsPage(){
 
   // جهّز فورم الإضافة
   renderAdminPermitPageForm();
+
+  // خفي التعديل أولًا
+  hideAdminEditBox();
+
+  // اعرض التصاريح الحالية
+  renderAdminPermitsCurrentList();
+}
+function showAdminEditBox(html){
+  $("adminEditBox").innerHTML = html;
+  $("adminEditBox").classList.remove("hidden");
+}
+
+function hideAdminEditBox(){
+  $("adminEditBox").innerHTML = "";
+  $("adminEditBox").classList.add("hidden");
+}
+
+function startAdminEdit(civilId){
+  const p = people.find(x => x.civilId === civilId);
+  if(!p){
+    toast("لم يتم العثور على تصريح للتعديل", false);
+    return;
+  }
+
+  editingCivilId = civilId;
+
+  showAdminEditBox(`
+    <h3>تعديل تصريح: ${esc(p.name)}</h3>
+    <form id="adminEditForm">
+      <div id="adminEditFields" class="form-grid">
+        ${activeFields().map(f => makeInput(f, "edit_", p[f.key])).join("")}
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="green">حفظ التعديلات</button>
+        <button type="button" class="gray" onclick="hideAdminEditBox()">إلغاء</button>
+      </div>
+    </form>
+  `);
+
+  const editForm = $("adminEditForm");
+  if(editForm){
+    editForm.onsubmit = null;
+
+    // استخدم نفس saveEdit الموجود عندك في صفحة التصاريح
+    editForm.addEventListener("submit", async (e) => {
+      // نخلي IDs تبقى زي saveEdit المتوقع (admin code يستخدم edit_*)
+      // saveEdit تشتغل لأنها تعتمد على editForm submit
+      await saveEdit(e);
+    });
+  }
+}
+
+function renderAdminPermitsCurrentList(){
+  $("adminPermitsList").innerHTML = !people || !people.length
+    ? `<div class="empty">لا توجد تصاريح حاليًا</div>`
+    : `
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>الرقم المدني</th>
+              <th>الشركة</th>
+              <th>البداية</th>
+              <th>النهاية</th>
+              <th>الحالة</th>
+              <th>QR</th>
+              <th>التعديل</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${people.map(p => {
+              const s = status(p);
+
+              return `
+                <tr>
+                  <td>${esc(p.name || "-")}</td>
+                  <td>${esc(p.civilId || "-")}</td>
+                  <td>${esc(p.company || "-")}</td>
+                  <td>${formatDate(p.permitStart)}</td>
+                  <td>${formatDate(p.permitEnd)}</td>
+                  <td><span class="status ${s.css}">${s.text}</span></td>
+
+                  <td>
+                    ${
+                      s.allowed
+                        ? `
+                          <button class="green" onclick="printPersonQR('${p.id}')">عرض/طباعة QR</button>
+                          <button class="orange" onclick="downloadPersonQR('${p.id}')">حفظ QR</button>
+                        `
+                        : `<button class="gray" disabled>غير فعال</button>`
+                    }
+                  </td>
+
+                  <td>
+                    <button class="orange" onclick="startAdminEdit('${esc(p.civilId)}')">تعديل</button>
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
 }
 
 function backToAdminHome(){
