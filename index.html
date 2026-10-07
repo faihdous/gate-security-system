@@ -1581,13 +1581,20 @@ function dbToPermit(row){
     customData: row.custom_data || {}
   };
 }
+function localDateKeyFromDate(d){
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
+  
 function dbToLog(row){
+  const dt = new Date(row.entry_time || row.created_at);
+
   return {
     id: row.id,
-    date: row.created_at
-      ? row.created_at.slice(0,10)
-      : "",
+    date: isNaN(dt.getTime()) ? "" : localDateKeyFromDate(dt),
     time: row.entry_time || row.created_at || "",
     timeText: row.entry_time
       ? new Date(row.entry_time).toLocaleTimeString("ar-KW")
@@ -1605,6 +1612,7 @@ function dbToLog(row){
     reason: row.reason || ""
   };
 }
+
 async function loadPeopleFromSupabase(){
   const { data, error } = await supabaseClient
     .from("permits")
