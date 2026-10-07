@@ -1423,16 +1423,7 @@ tbody tr:last-child td{
       </div>
     </form>
   </section>
-
-  <section class="card">
-    <h2>التصاريح الحالية</h2>
-    <div id="adminPermitsList"></div>
-  </section>
 </section>
-
-<!-- ضع هذا div هنا بعد إغلاق adminAddPermitPage -->
-<div id="adminEditResult"></div>
-
 
 </main>
   
@@ -2646,48 +2637,7 @@ await addAudit(
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
 function searchPermitForEdit(){let c=$("permitSearchCivilId").value.trim(),p=people.find(x=>x.civilId===c);if(!p)return $("permitSearchResult").innerHTML=`<div class="empty">لم يتم العثور على تصريح بهذا الرقم المدني.</div>`;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><button class="orange" onclick="startEdit('${esc(c)}')">تعديل جميع بيانات التصريح</button><button class="red" onclick="$('cancelCivilId').value='${esc(c)}';cancelPermit()">إلغاء التصريح</button></div>`}
 function startEdit(c){let p=people.find(x=>x.civilId===c);editingCivilId=c;$("permitSearchResult").innerHTML=`<div class="edit-box"><h3>تعديل تصريح: ${esc(p.name)}</h3><form id="editForm"><div id="editFields" class="form-grid">${activeFields().map(f=>makeInput(f,"edit_",p[f.key])).join("")}</div><div class="actions"><button class="green">حفظ التعديلات</button><button type="button" class="gray" onclick="searchPermitForEdit()">إلغاء</button></div></form></div>`;$("editForm").addEventListener("submit",saveEdit)}
-function editPermitByCivilId(civilId){
-  // نفس منطق صفحة التصاريح: يبدأ نموذج التعديل
-  startEdit(civilId);
-}
-
-async function cancelPermitByCivilId(civilId){
-  // نفس منطق صفحة التصاريح: يعتمد على input cancelCivilId
-  // نستخدم الناسخ القيم مباشرة
-  let old = $("cancelCivilId");
-  if(!old){
-    // إذا ما فيه input في admin (غالباً ما هو موجود عندك)
-    // نعمل إلغاء مباشرة بدون input:
-    const p = people.find(x => x.civilId === civilId);
-    if(!p) return toast("لم يتم العثور على التصريح", false);
-    if(!confirm("هل تريد إلغاء هذا التصريح؟")) return;
-
-    const { error } = await supabaseClient
-      .from("permits")
-      .update({ is_active: false })
-      .eq("id", p.id);
-
-    if(error){
-      console.error(error);
-      return toast("تعذر إلغاء التصريح", false);
-    }
-
-    people = people.filter(x => x.id !== p.id);
-    await addAudit(
-      "إلغاء تصريح",
-      `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
-    );
-
-    toast("تم إلغاء التصريح");
-    renderPermitsListTo("adminPermitsList");
-    return;
-  }
-
-  old.value = civilId;
-  await cancelPermit();
-}
-
-  async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});const { error } = await supabaseClient
+async function saveEdit(e){e.preventDefault();let p=people.find(x=>x.civilId===editingCivilId),old=p.civilId;for(let f of allFields()){let i=$("edit_"+f.key);if(!i)continue;if(f.type==="file"){if(i.files[0])p[f.key]=await fileData(i.files[0])}else p[f.key]=i.value.trim()}if(!p.civilId||!p.name)return toast("الرقم المدني والاسم مطلوبان",false);if(people.some(x=>x!==p&&x.civilId===p.civilId))return toast("الرقم المدني مستخدم في تصريح آخر",false);logs.forEach(l=>{if(l.civilId===old)l.civilId=p.civilId});const { error } = await supabaseClient
   .from("permits")
   .update({
     civil_id: p.civilId,
@@ -2717,9 +2667,9 @@ await addAudit(
 );
 
 editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح بنجاح")}
+function renderPermitsList(){
 
-  function renderPermitsListTo(containerId){
-  $(containerId).innerHTML = !people.length
+  $("permitsList").innerHTML = !people.length
     ? `<div class="empty">لا توجد تصاريح حاليًا</div>`
     : `
       <div class="table-wrapper">
@@ -2733,21 +2683,23 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
               <th>النهاية</th>
               <th>الحالة</th>
               <th>QR Code</th>
-              <th>الإجراء</th>
             </tr>
           </thead>
 
           <tbody>
             ${people.map(p => {
               const s = status(p);
-              const civilId = p.civilId || "";
 
               return `
                 <tr>
                   <td>${esc(p.name)}</td>
+
                   <td>${esc(p.civilId || "-")}</td>
+
                   <td>${esc(p.company || "-")}</td>
+
                   <td>${formatDate(p.permitStart)}</td>
+
                   <td>${formatDate(p.permitEnd)}</td>
 
                   <td>
@@ -2757,40 +2709,37 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
                   </td>
 
                   <td>
-                    ${
-                      s.allowed
-                        ? `
-                          <button class="green" onclick="printPersonQR('${p.id}')">
-                            عرض / طباعة QR
-                          </button>
+  ${
+    s.allowed
+      ? `
+        <button
+          class="green"
+          onclick="printPersonQR('${p.id}')">
+          عرض / طباعة QR
+        </button>
 
-                          <button class="orange" onclick="sharePersonQRWithWhatsApp('${p.id}')">
-                            إرسال QR واتساب (صورة)
-                          </button>
+        <button
+          class="orange"
+          onclick="sharePersonQRWithWhatsApp('${p.id}')">
+          إرسال QR واتساب (صورة)
+        </button>
 
-                          <button class="orange" onclick="downloadPersonQR('${p.id}')">
-                            حفظ QR
-                          </button>
-                        `
-                        : `<button class="gray" disabled>غير فعال</button>`
-                    }
-                  </td>
+        <button
+          class="orange"
+          onclick="downloadPersonQR('${p.id}')">
+          حفظ QR
+        </button>
+      `
+      : `
+        <button
+          class="gray"
+          disabled>
+          غير فعال
+        </button>
+      `
+  }
+</td>
 
-                  <td>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                     <button class="orange"
-  onclick="editPermitByCivilId(${JSON.stringify(civilId)})">
-  تعديل
-</button>
-
-<button class="red"
-  ${s.allowed ? "" : "disabled"}
-  onclick="cancelPermitByCivilId(${JSON.stringify(civilId)})">
-  إلغاء التصريح
-</button>
-
-                    </div>
-                  </td>
                 </tr>
               `;
             }).join("")}
@@ -2799,8 +2748,6 @@ editingCivilId=null;renderPermitsPage();toast("تم تعديل التصريح ب
       </div>
     `;
 }
-
-
 
 async function printPersonQR(personId){
 
@@ -3064,16 +3011,15 @@ function renderPermitsPage(){
 }
 
   function showAdminAddPermitPage(){
+  // نخفي كل sections داخل adminPage ما عدا صفحة الإضافة
   document.querySelectorAll("#adminPage > main > section").forEach(sec => {
     if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
   });
 
   $("adminAddPermitPage").classList.remove("hidden");
 
+  // جهّز فورم الإضافة
   renderAdminPermitPageForm();
-
-  // ✅ التصاريح الحالية داخل صفحة الإضافة (نفس اللي بصفحة التصاريح)
-  renderPermitsListTo("adminPermitsList");
 }
 
 function backToAdminHome(){
@@ -3583,219 +3529,7 @@ function stopSecurityPolling() {
     securityPollTimer = null;
   }
 }
-function showAdminAddPermitPage(){
-  // إظهار صفحة إضافة/إدارة التصاريح داخل الأدمن
-  $("adminAddPermitPage").classList.remove("hidden");
 
-  // نخلي باقي sections الرئيسية في الأدمن مخفية
-  document.querySelectorAll("#adminPage > main > section").forEach(sec => {
-    if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
-  });
-
-  // تعبئة نموذج الإضافة
-  renderAdminPermitPageForm();
-
-  // ✅ تعبئة التصاريح الحالية داخل الأدمن
-  renderPermitsListTo("adminPermitsList");
-}
-
-function backToAdminHome(){
-  // نرجع كل sections الأساسية تظهر
-  document.querySelectorAll("#adminPage > main > section").forEach(sec => {
-    if(sec.id !== "adminAddPermitPage") sec.classList.remove("hidden");
-  });
-
-  $("adminAddPermitPage").classList.add("hidden");
-  renderAdminPage();
-}
-
-function renderAdminPermitPageForm(){
-  renderPermitFieldsTo("adminPermitFields", "admin_new_");
-
-  const form = $("adminPermitForm");
-  form.onsubmit = null;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const ok = await savePermitFromPrefix("admin_new_", "تم حفظ التصريح بنجاح");
-    if(ok){
-      e.target.reset();
-      backToAdminHome();
-    }
-  }, { once: false });
-}
-
-// ✅ قائمة التصاريح الحالية داخل الأدمن
-function renderPermitsListTo(containerId){
-  $(containerId).innerHTML = !people.length
-    ? `<div class="empty">لا توجد تصاريح حاليًا</div>`
-    : `
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>الاسم</th>
-              <th>الرقم المدني</th>
-              <th>الشركة</th>
-              <th>البداية</th>
-              <th>النهاية</th>
-              <th>الحالة</th>
-              <th>الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${people.map(p => {
-              const s = status(p);
-              const civilId = p.civilId || "";
-              return `
-                <tr>
-                  <td>${esc(p.name)}</td>
-                  <td>${esc(p.civilId || "-")}</td>
-                  <td>${esc(p.company || "-")}</td>
-                  <td>${formatDate(p.permitStart)}</td>
-                  <td>${formatDate(p.permitEnd)}</td>
-                  <td><span class="status ${s.css}">${s.text}</span></td>
-                  <td>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                      <button class="orange" onclick="adminStartEdit(${JSON.stringify(civilId)})">تعديل</button>
-                      <button class="red" ${s.allowed ? "" : "disabled"} onclick="adminCancelPermitByCivilId(${JSON.stringify(civilId)})">إلغاء</button>
-                    </div>
-                  </td>
-                </tr>
-              `;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
-}
-
-// فتح نموذج التعديل داخل الأدمن
-function adminStartEdit(civilId){
-  const p = people.find(x => x.civilId === civilId);
-  if(!p){
-    toast("لم يتم العثور على التصريح", false);
-    return;
-  }
-  editingCivilId = civilId;
-
-  // تأكد موجود عندك هذا div:
-  // <div id="adminEditResult"></div>
-  $("adminEditResult").innerHTML = `
-    <div class="edit-box">
-      <h3>تعديل تصريح: ${esc(p.name)}</h3>
-      <form id="adminEditForm">
-        <div id="adminEditFields" class="form-grid">
-          ${activeFields().map(f => makeInput(f, "admin_edit_", p[f.key])).join("")}
-        </div>
-        <div class="actions">
-          <button type="submit" class="green">حفظ التعديلات</button>
-          <button type="button" class="gray" onclick="closeAdminEdit()">إلغاء</button>
-        </div>
-      </form>
-    </div>
-  `;
-
-  const form = $("adminEditForm");
-  form.onsubmit = null;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await adminSaveEdit();
-  });
-}
-
-function closeAdminEdit(){
-  $("adminEditResult").innerHTML = "";
-  editingCivilId = null;
-}
-
-async function adminSaveEdit(){
-  const p = people.find(x => x.civilId === editingCivilId);
-  if(!p) return;
-
-  for (let f of allFields()){
-    const i = $("admin_edit_" + f.key);
-    if(!i) continue;
-
-    if(f.type === "file"){
-      if(i.files && i.files[0]) p[f.key] = await fileData(i.files[0]);
-    }else{
-      p[f.key] = i.value.trim();
-    }
-  }
-
-  if(!p.civilId || !p.name){
-    toast("الرقم المدني والاسم مطلوبان", false);
-    return;
-  }
-
-  if(people.some(x => x !== p && x.civilId === p.civilId)){
-    toast("الرقم المدني مستخدم في تصريح آخر", false);
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("permits")
-    .update({
-      civil_id: p.civilId,
-      full_name: p.name,
-      company: p.company || "",
-      job: p.job || "",
-      phone: p.phone || "",
-      permit_start: p.permitStart || null,
-      permit_end: p.permitEnd || null,
-      allowed_area: p.allowedArea || "",
-      card_image_path: p.cardImage || "",
-      notes: p.notes || "",
-      custom_data: p.customData || {},
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", p.id);
-
-  if(error){
-    console.error(error);
-    toast("تعذر حفظ التعديلات: " + error.message, false);
-    return;
-  }
-
-  await addAudit("تعديل تصريح", `تم تعديل تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`);
-
-  closeAdminEdit();
-  renderPermitsListTo("adminPermitsList");
-  renderAdminPage();
-  toast("تم تعديل التصريح بنجاح");
-}
-
-async function adminCancelPermitByCivilId(civilId){
-  const p = people.find(x => x.civilId === civilId);
-  if(!p){
-    toast("لم يتم العثور على التصريح", false);
-    return;
-  }
-
-  if(!confirm("هل تريد إلغاء هذا التصريح؟")) return;
-
-  const { error } = await supabaseClient
-    .from("permits")
-    .update({ is_active: false })
-    .eq("id", p.id);
-
-  if(error){
-    console.error(error);
-    toast("تعذر إلغاء التصريح: " + error.message, false);
-    return;
-  }
-
-  people = people.filter(x => x.id !== p.id);
-
-  await addAudit("إلغاء تصريح", `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`);
-
-  closeAdminEdit();
-  renderPermitsListTo("adminPermitsList");
-  renderAdminPage();
-  toast("تم إلغاء التصريح");
-}
-
-<script>
 async function initialize() {
   await loadAllData();
 
@@ -3810,55 +3544,58 @@ async function initialize() {
     $("securityPage").classList.remove("hidden");
 
     $("securityUserName").textContent =
-      "مستخدم الأمن: " + currentSecurityUser.username;
+      "مستخدم الأمن: " +
+      currentSecurityUser.username;
 
     refreshSecurity();
-    startSecurityPolling(); 
-    startRealtime();
-    return;
+startSecurityPolling(); // ✅ شغّل التحديث الدوري لصفحة الأمن
+startRealtime();
+return;
+
+
   }
 
   const permitsSession =
     sessionStorage.getItem("gatePermitsUser");
 
   if (permitsSession) {
-    const permitsUser = JSON.parse(permitsSession);
+  const permitsUser = JSON.parse(permitsSession);
 
-    $("loginPage").classList.add("hidden");
-    $("permitsPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("permitsPage").classList.remove("hidden");
 
-    document.querySelector(
-      "#permitsPage .header-left span"
-    ).textContent =
-      "مستخدم التصاريح: " + permitsUser.username;
+  document.querySelector(
+    "#permitsPage .header-left span"
+  ).textContent =
+    "مستخدم التصاريح: " + permitsUser.username;
 
-    renderPermitsPage();
-    startSecurityPolling();
-    startRealtime();
-    return;
-  }
+  renderPermitsPage();
+  startSecurityPolling();
+  startRealtime();
+  return;
+}
 
   const adminSession =
     sessionStorage.getItem("gateAdminUser");
 
-  if (adminSession) {
-    const adminUser = JSON.parse(adminSession);
+ if (adminSession) {
+  const adminUser = JSON.parse(adminSession);
 
-    $("loginPage").classList.add("hidden");
-    $("adminPage").classList.remove("hidden");
+  $("loginPage").classList.add("hidden");
+  $("adminPage").classList.remove("hidden");
 
-    document.querySelector(
-      "#adminPage .header-left span"
-    ).textContent =
-      "مستخدم الإدارة: " + adminUser.username;
+  document.querySelector("#adminPage .header-left span")
+    .textContent = "مستخدم الإدارة: " + adminUser.username;
 
-    await renderAdminPage();
-    startSecurityPolling();
-    startRealtime();
-    return;
-  }
+  await renderAdminPage();
+  startSecurityPolling();
+
+  startRealtime(); // ✅ أضف هذا
+  return;
 }
 
+
+}
 function saveFields(){
   localStorage.setItem(
     "gateCustomFields",
