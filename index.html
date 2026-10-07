@@ -3795,6 +3795,7 @@ async function adminCancelPermitByCivilId(civilId){
   toast("تم إلغاء التصريح");
 }
 
+<script>
 async function initialize() {
   await loadAllData();
 
@@ -3809,58 +3810,55 @@ async function initialize() {
     $("securityPage").classList.remove("hidden");
 
     $("securityUserName").textContent =
-      "مستخدم الأمن: " +
-      currentSecurityUser.username;
+      "مستخدم الأمن: " + currentSecurityUser.username;
 
     refreshSecurity();
-startSecurityPolling(); // ✅ شغّل التحديث الدوري لصفحة الأمن
-startRealtime();
-return;
-
-
+    startSecurityPolling(); 
+    startRealtime();
+    return;
   }
 
   const permitsSession =
     sessionStorage.getItem("gatePermitsUser");
 
   if (permitsSession) {
-  const permitsUser = JSON.parse(permitsSession);
+    const permitsUser = JSON.parse(permitsSession);
 
-  $("loginPage").classList.add("hidden");
-  $("permitsPage").classList.remove("hidden");
+    $("loginPage").classList.add("hidden");
+    $("permitsPage").classList.remove("hidden");
 
-  document.querySelector(
-    "#permitsPage .header-left span"
-  ).textContent =
-    "مستخدم التصاريح: " + permitsUser.username;
+    document.querySelector(
+      "#permitsPage .header-left span"
+    ).textContent =
+      "مستخدم التصاريح: " + permitsUser.username;
 
-  renderPermitsPage();
-  startSecurityPolling();
-  startRealtime();
-  return;
-}
+    renderPermitsPage();
+    startSecurityPolling();
+    startRealtime();
+    return;
+  }
 
   const adminSession =
     sessionStorage.getItem("gateAdminUser");
 
- if (adminSession) {
-  const adminUser = JSON.parse(adminSession);
+  if (adminSession) {
+    const adminUser = JSON.parse(adminSession);
 
-  $("loginPage").classList.add("hidden");
-  $("adminPage").classList.remove("hidden");
+    $("loginPage").classList.add("hidden");
+    $("adminPage").classList.remove("hidden");
 
-  document.querySelector("#adminPage .header-left span")
-    .textContent = "مستخدم الإدارة: " + adminUser.username;
+    document.querySelector(
+      "#adminPage .header-left span"
+    ).textContent =
+      "مستخدم الإدارة: " + adminUser.username;
 
-  await renderAdminPage();
-  startSecurityPolling();
-
-  startRealtime(); // ✅ أضف هذا
-  return;
+    await renderAdminPage();
+    startSecurityPolling();
+    startRealtime();
+    return;
+  }
 }
 
-
-}
 function saveFields(){
   localStorage.setItem(
     "gateCustomFields",
