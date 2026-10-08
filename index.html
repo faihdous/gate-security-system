@@ -1643,7 +1643,7 @@ async function loadLogsFromSupabase() {
   isFetchingLogs = true;
 
   try {
-    let query = supabaseClient
+    const { data, error } = await supabaseClient
       .from("gate_logs")
       .select(`
         id,created_at,entry_time,exit_time,
@@ -1652,14 +1652,7 @@ async function loadLogsFromSupabase() {
         reason
       `)
       .order("created_at", { ascending: false })
-      .limit(30);
-
-    // ✅ جلب الجديد/المحدّث مقارنةً بآخر created_at شفناه
-    if (lastSeenCreatedAt) {
-      query = query.lt("created_at", lastSeenCreatedAt);
-    }
-
-    const { data, error } = await query;
+      .limit(200);
 
     if (error) {
       console.error("خطأ تحميل السجلات:", error);
@@ -1668,43 +1661,25 @@ async function loadLogsFromSupabase() {
 
     if (!data || !data.length) return;
 
-    // ✅ حدّث cursor بأحدث created_at من الرد الحالي
-    lastSeenCreatedAt = data[0].created_at;
-
-    // ✅ أحوّل البيانات القادمة إلى شكل logs الداخلي
     const newLogs = data.map(dbToLog);
 
-    // ✅ خريطة لمواضع السجلات الموجودة حسب id لتحديثها
-    const indexById = new Map(logs.map((l, i) => [String(l.id), i]));
+    // بدلاً من unshift/two-way update المعقدة، خلّطهم بالـ id
+    const map = new Map(logs.map(l => [String(l.id), l]));
+    for (const nl of newLogs) map.set(String(nl.id), nl);
+    logs = Array.from(map.values());
 
-    for (const nl of newLogs) {
-      const key = String(nl.id);
+    logs.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
 
-      if (indexById.has(key)) {
-        // ✅ تحديث السجل الموجود (مثل exit_time)
-        const idx = indexById.get(key);
-        logs[idx] = nl;
-      } else {
-        // ✅ إضافة سجل جديد
-        logs.unshift(nl);
-      }
-    }
-
-  // ✅ ترتيب صحيح حسب created_at (مع حماية من undefined)
-logs.sort((a, b) => {
-  const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-  const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-  return tb - ta;
-});
-
-
-    // ✅ حد للذاكرة
     logs = logs.slice(0, 300);
-
   } finally {
     isFetchingLogs = false;
   }
 }
+
 
 
 async function loadAllData(){
