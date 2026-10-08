@@ -1530,6 +1530,13 @@ allowedArea:"المبنى الرئيسي - البوابة 2",cardImage:"",notes:
 let people = [];
 let logs = [];
 
+let lastSeenCreatedAt = null;
+let isFetchingLogs = false;
+
+let lastPermitsReloadAt = 0;
+const PERMITS_RELOAD_EVERY_MS = 60000; // كل دقيقة
+
+
 let customFields =
   JSON.parse(localStorage.getItem("gateCustomFields")) || [];
 
@@ -1629,20 +1636,55 @@ async function loadPeopleFromSupabase(){
   people = (data || []).map(dbToPermit);
 }
 
-async function loadLogsFromSupabase(){
-  const { data, error } = await supabaseClient
-    .from("gate_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
+async function loadLogsFromSupabase() {
+  if (isFetchingLogs) return;
+  isFetchingLogs = true;
 
-  if(error){
-    console.error("خطأ تحميل السجلات:", error);
-    toast("تعذر تحميل السجلات من Supabase", false);
-    return;
+  try {
+    let query = supabaseClient
+      .from("gate_logs")
+      .select(`
+        id,created_at,entry_time,exit_time,
+        civil_id,full_name,type,status,
+        security_user,exit_security_user,
+        reason
+      `)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    // ✅ جلب الجديد فقط
+    if (lastSeenCreatedAt) {
+      query = query.lt("created_at", lastSeenCreatedAt);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("خطأ تحميل السجلات:", error);
+      return;
+    }
+
+    if (!data || !data.length) return;
+
+    // ✅ حدّث cursor بأحدث created_at من الرد الحالي
+    // (لأن الترتيب desc، أول عنصر data[0] هو الأحدث داخل الرد)
+    lastSeenCreatedAt = data[0].created_at;
+
+    // ✅ أضف الجديد فوق logs المحليّة
+    const newLogs = data.map(dbToLog);
+
+    // منع تكرار في حال حصل overlap بسيط
+    const existingIds = new Set(logs.map(l => String(l.id)));
+    for (const nl of newLogs) {
+      if (!existingIds.has(String(nl.id))) logs.unshift(nl);
+    }
+
+    // ✅ حد للذاكرة/الـ render (اختياري لكن مفيد)
+    logs = logs.slice(0, 300);
+
+  } finally {
+    isFetchingLogs = false;
   }
-
-  logs = (data || []).map(dbToLog);
 }
 
 
@@ -1777,6 +1819,7 @@ await addAudit(
   "مسح جميع التقارير",
   "تم مسح جميع تقارير الدخول والخروج"
 );
+lastSeenCreatedAt = null;
 
 
   if(!$("adminPage").classList.contains("hidden")){
@@ -3724,12 +3767,17 @@ console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("deta
         
         // إذا كنت داخل "إضافة تصريح جديد"
         // (هذه الصفحة تعتبر داخل adminPage، لذلك نحدّث فوراً list الخاصة بالتصاريح)
-        if (!$("adminAddPermitPage").classList.contains("hidden")) {
-          await loadPeopleFromSupabase();
-          renderPermitsPage(); // تحديث أي تصاريح لو تستخدم نفس المنطق
-          renderAdminPermitsCurrentList(); // تحديث قائمة تصاريح الإدارة
-          hideAdminEditBox(); // اختياري: يمنع تعارض مع التعديل المفتوح
-        }
+       if (!$("adminAddPermitPage").classList.contains("hidden")) {
+  const now = Date.now();
+  if (now - lastPermitsReloadAt > PERMITS_RELOAD_EVERY_MS) {
+    lastPermitsReloadAt = now;
+    await loadPeopleFromSupabase();
+    renderPermitsPage();
+    renderAdminPermitsCurrentList();
+  }
+  hideAdminEditBox();
+}
+
 
        if (!$("detailsModal").classList.contains("hidden")) {
   if (window.__lastAdminDetailsType) {
@@ -3747,16 +3795,21 @@ console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("deta
 
       // 5) صفحة التصاريح (إن كانت ظاهرة)
       if (!$("permitsPage").classList.contains("hidden")) {
-        await loadPeopleFromSupabase();
-        renderPermitsPage();
-      }
+  const now = Date.now();
+  if (now - lastPermitsReloadAt > PERMITS_RELOAD_EVERY_MS) {
+    lastPermitsReloadAt = now;
+    await loadPeopleFromSupabase();
+    renderPermitsPage();
+  }
+}
+
 
     } catch (e) {
       console.error("Polling error:", e);
     } finally {
       pollingRunning = false;
     }
-  }, 6000);
+  }, 10000);
 }
 
 
