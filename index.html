@@ -1652,7 +1652,7 @@ async function loadLogsFromSupabase() {
       .order("created_at", { ascending: false })
       .limit(30);
 
-    // ✅ جلب الجديد/المحدّث مقارنةً بآخر created_at شفناه
+    // ✅ جلب الجديد فقط
     if (lastSeenCreatedAt) {
       query = query.lt("created_at", lastSeenCreatedAt);
     }
@@ -1667,36 +1667,19 @@ async function loadLogsFromSupabase() {
     if (!data || !data.length) return;
 
     // ✅ حدّث cursor بأحدث created_at من الرد الحالي
+    // (لأن الترتيب desc، أول عنصر data[0] هو الأحدث داخل الرد)
     lastSeenCreatedAt = data[0].created_at;
 
-    // ✅ أحوّل البيانات القادمة إلى شكل logs الداخلي
+    // ✅ أضف الجديد فوق logs المحليّة
     const newLogs = data.map(dbToLog);
 
-    // ✅ خريطة لمواضع السجلات الموجودة حسب id لتحديثها
-    const indexById = new Map(logs.map((l, i) => [String(l.id), i]));
-
+    // منع تكرار في حال حصل overlap بسيط
+    const existingIds = new Set(logs.map(l => String(l.id)));
     for (const nl of newLogs) {
-      const key = String(nl.id);
-
-      if (indexById.has(key)) {
-        // ✅ تحديث السجل الموجود (مثل exit_time)
-        const idx = indexById.get(key);
-        logs[idx] = nl;
-      } else {
-        // ✅ إضافة سجل جديد
-        logs.unshift(nl);
-      }
+      if (!existingIds.has(String(nl.id))) logs.unshift(nl);
     }
 
-    // ✅ ترتيب جديد بعد التحديث (اختياري لكن يضبط العرض)
-    // بما أننا نعرض حسب created_at غالبًا، نرتّب حسب created_at إن كان موجود/أو id
-    logs.sort((a, b) => {
-      // إذا عندك created_at محذوفة من dbToLog فلا بأس: سنقارن id كبديل
-      // (يفضل أن dbToLog يحتوي created_at لو تبي ترتيب دقيق).
-      return String(b.id).localeCompare(String(a.id), "ar");
-    });
-
-    // ✅ حد للذاكرة
+    // ✅ حد للذاكرة/الـ render (اختياري لكن مفيد)
     logs = logs.slice(0, 300);
 
   } finally {
@@ -3154,23 +3137,21 @@ function renderPermitsPage(){
 }
 
   function showAdminAddPermitPage(){
-  function showAdminAddPermitPage(){
   document.querySelectorAll("#adminPage > main > section").forEach(sec => {
     if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
   });
 
   $("adminAddPermitPage").classList.remove("hidden");
 
+  // جهّز فورم الإضافة
   renderAdminPermitPageForm();
+
+  // خفي التعديل أولًا
   hideAdminEditBox();
 
+  // اعرض التصاريح الحالية
   renderAdminPermitsCurrentList();
-
-  // ✅ تحديث جدول الموجودين داخل المبنى (حتى لو القسم الآخر مخفي)
-  showInsidePeople();
-  refreshAdminBoxes();
 }
-
 function showAdminEditBox(html){
   $("adminEditBox").innerHTML = html;
   $("adminEditBox").classList.remove("hidden");
