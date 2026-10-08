@@ -1652,7 +1652,7 @@ async function loadLogsFromSupabase() {
       .order("created_at", { ascending: false })
       .limit(30);
 
-    // ✅ جلب الجديد فقط
+    // ✅ جلب الجديد/المحدّث مقارنةً بآخر created_at شفناه
     if (lastSeenCreatedAt) {
       query = query.lt("created_at", lastSeenCreatedAt);
     }
@@ -1667,19 +1667,36 @@ async function loadLogsFromSupabase() {
     if (!data || !data.length) return;
 
     // ✅ حدّث cursor بأحدث created_at من الرد الحالي
-    // (لأن الترتيب desc، أول عنصر data[0] هو الأحدث داخل الرد)
     lastSeenCreatedAt = data[0].created_at;
 
-    // ✅ أضف الجديد فوق logs المحليّة
+    // ✅ أحوّل البيانات القادمة إلى شكل logs الداخلي
     const newLogs = data.map(dbToLog);
 
-    // منع تكرار في حال حصل overlap بسيط
-    const existingIds = new Set(logs.map(l => String(l.id)));
+    // ✅ خريطة لمواضع السجلات الموجودة حسب id لتحديثها
+    const indexById = new Map(logs.map((l, i) => [String(l.id), i]));
+
     for (const nl of newLogs) {
-      if (!existingIds.has(String(nl.id))) logs.unshift(nl);
+      const key = String(nl.id);
+
+      if (indexById.has(key)) {
+        // ✅ تحديث السجل الموجود (مثل exit_time)
+        const idx = indexById.get(key);
+        logs[idx] = nl;
+      } else {
+        // ✅ إضافة سجل جديد
+        logs.unshift(nl);
+      }
     }
 
-    // ✅ حد للذاكرة/الـ render (اختياري لكن مفيد)
+    // ✅ ترتيب جديد بعد التحديث (اختياري لكن يضبط العرض)
+    // بما أننا نعرض حسب created_at غالبًا، نرتّب حسب created_at إن كان موجود/أو id
+    logs.sort((a, b) => {
+      // إذا عندك created_at محذوفة من dbToLog فلا بأس: سنقارن id كبديل
+      // (يفضل أن dbToLog يحتوي created_at لو تبي ترتيب دقيق).
+      return String(b.id).localeCompare(String(a.id), "ar");
+    });
+
+    // ✅ حد للذاكرة
     logs = logs.slice(0, 300);
 
   } finally {
