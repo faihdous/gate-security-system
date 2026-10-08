@@ -2680,27 +2680,30 @@ async function cancelPermit(){
     return;
   }
 
+  // ✅ حذف نهائي من قاعدة البيانات
   const { error } = await supabaseClient
     .from("permits")
-    .update({ is_active: false })
+    .delete()
     .eq("id", p.id);
 
   if(error){
     console.error(error);
-    return toast("تعذر إلغاء التصريح", false);
+    return toast("تعذر حذف التصريح", false);
   }
 
+  // تحديث الواجهة
   people = people.filter(x => x.id !== p.id);
-await addAudit(
-  "إلغاء تصريح",
-  `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
-);
 
+  await addAudit(
+    "إلغاء تصريح",
+    `تم حذف تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
+  );
 
   $("cancelCivilId").value = "";
   renderPermitsPage();
-  toast("تم إلغاء التصريح");
+  toast("تم إلغاء التصريح وحذفه بنجاح");
 }
+
 async function adminCancelPermitByCivilId(civilId){
   civilId = String(civilId ?? "").trim();
   if(!civilId) return;
@@ -2719,28 +2722,30 @@ async function adminCancelPermitByCivilId(civilId){
     return;
   }
 
+  // ✅ حذف نهائي من قاعدة البيانات
   const { error } = await supabaseClient
     .from("permits")
-    .update({ is_active: false })
+    .delete()
     .eq("id", p.id);
 
   if(error){
     console.error(error);
-    toast("تعذر إلغاء التصريح: " + error.message, false);
+    toast("تعذر حذف التصريح: " + error.message, false);
     return;
   }
 
+  // تحديث الواجهة
   people = people.filter(x => String(x.id) !== String(p.id));
 
   await addAudit(
     "إلغاء تصريح",
-    `تم إلغاء تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
+    `تم حذف تصريح الرقم المدني: ${p.civilId} والاسم: ${p.name}`
   );
 
   renderAdminPermitsCurrentList();
   hideAdminEditBox();
 
-  toast("تم إلغاء التصريح بنجاح");
+  toast("تم إلغاء التصريح بنجاح وحذفه");
 }
 
 function renderFields(){ $("allFieldsList").innerHTML=allFields().map(f=>{let d=disabledFields.includes(f.key);return`<div class="field-row"><div><b>${esc(f.label)}</b><small>${f.system?"حقل أساسي":"حقل مخصص"} - ${d?"غير فعال":"فعال"}</small></div><div class="field-actions"><button class="${d?"green":"red"}" onclick="toggleField('${esc(f.key)}')">${d?"إعادة تفعيل":"إلغاء الحقل"}</button>${!f.system?`<button class="gray" onclick="deleteCustomField('${esc(f.key)}')">حذف نهائي</button>`:""}</div></div>`}).join("")}
