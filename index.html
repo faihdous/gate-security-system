@@ -3137,21 +3137,23 @@ function renderPermitsPage(){
 }
 
   function showAdminAddPermitPage(){
+  function showAdminAddPermitPage(){
   document.querySelectorAll("#adminPage > main > section").forEach(sec => {
     if(sec.id !== "adminAddPermitPage") sec.classList.add("hidden");
   });
 
   $("adminAddPermitPage").classList.remove("hidden");
 
-  // جهّز فورم الإضافة
   renderAdminPermitPageForm();
-
-  // خفي التعديل أولًا
   hideAdminEditBox();
 
-  // اعرض التصاريح الحالية
   renderAdminPermitsCurrentList();
+
+  // ✅ تحديث جدول الموجودين داخل المبنى (حتى لو القسم الآخر مخفي)
+  showInsidePeople();
+  refreshAdminBoxes();
 }
+
 function showAdminEditBox(html){
   $("adminEditBox").innerHTML = html;
   $("adminEditBox").classList.remove("hidden");
