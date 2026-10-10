@@ -3738,6 +3738,8 @@ ${m}`;
   );
 }
 
+let lastAuditReloadAt = 0;
+const AUDIT_RELOAD_EVERY_MS = 60000; // مرة كل دقيقة
   
 let securityPollTimer = null;
 let pollingRunning = false;
@@ -3788,19 +3790,12 @@ console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("deta
   }
 }
 
-
-        // 4) تحديث سجل التدقيق (Audit)
-        // إذا كنت تحتاجه أيضاً يظهر فوري:
-        await renderAuditLogs();
-      }
-
       // 5) صفحة التصاريح (إن كانت ظاهرة)
-      if (!$("permitsPage").classList.contains("hidden")) {
+  if (!$("adminPage").classList.contains("hidden")) {
   const now = Date.now();
-  if (now - lastPermitsReloadAt > PERMITS_RELOAD_EVERY_MS) {
-    lastPermitsReloadAt = now;
-    await loadPeopleFromSupabase();
-    renderPermitsPage();
+  if (now - lastAuditReloadAt > AUDIT_RELOAD_EVERY_MS) {
+    lastAuditReloadAt = now;
+    await renderAuditLogs();
   }
 }
 
@@ -3825,6 +3820,19 @@ function ensureRunning(){
   // startRealtime(); // مؤقتًا عشان نختبر polling فقط
 }
 
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopSecurityPolling();
+  } else {
+    // بس أعد التشغيل إذا فيه جلسة تسجيل دخول
+    const hasSecurity = sessionStorage.getItem("gateSecurityUser");
+    const hasPermits = sessionStorage.getItem("gatePermitsUser");
+    const hasAdmin = sessionStorage.getItem("gateAdminUser");
+    if (hasSecurity || hasPermits || hasAdmin) {
+      ensureRunning();
+    }
+  }
+});
 
 
 
