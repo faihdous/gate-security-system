@@ -3752,54 +3752,45 @@ function startSecurityPolling() {
     pollingRunning = true;
 
     try {
-      // حدث أحدث سجلات
       await loadLogsFromSupabase();
-console.log("ADMIN POLLING tick - logs:", logs?.length, "detailsOpen:", !$("detailsModal").classList.contains("hidden"));
 
-      // 1) صفحة الأمن (إن كانت ظاهرة)
       if (!$("securityPage").classList.contains("hidden")) {
         refreshSecurity();
       }
 
-      // 2) صفحة الإدارة (إن كانت ظاهرة)
       if (!$("adminPage").classList.contains("hidden")) {
-        // تحديث الصناديق + الجداول الأساسية
         refreshAdminBoxes();
         renderAdminLogs();
         showInsidePeople();
-        
-        // إذا كنت داخل "إضافة تصريح جديد"
-        // (هذه الصفحة تعتبر داخل adminPage، لذلك نحدّث فوراً list الخاصة بالتصاريح)
-       if (!$("adminAddPermitPage").classList.contains("hidden")) {
-  const now = Date.now();
-  if (now - lastPermitsReloadAt > PERMITS_RELOAD_EVERY_MS) {
-    lastPermitsReloadAt = now;
-    await loadPeopleFromSupabase();
-    renderPermitsPage();
-    renderAdminPermitsCurrentList();
-  }
-  hideAdminEditBox();
-}
 
+        // صفحة إضافة تصريح داخل الإدارة
+        if (!$("adminAddPermitPage").classList.contains("hidden")) {
+          const now = Date.now();
+          if (now - lastPermitsReloadAt > PERMITS_RELOAD_EVERY_MS) {
+            lastPermitsReloadAt = now;
+            await loadPeopleFromSupabase();
+            renderPermitsPage();
+            renderAdminPermitsCurrentList();
+          }
+          hideAdminEditBox();
+        }
 
-       if (!$("detailsModal").classList.contains("hidden")) {
-  if (window.__lastAdminDetailsType) {
-    showAdminStatDetails(window.__lastAdminDetailsType);
-  } else {
-    showAdminStatDetails("today");
-  }
-}
+        // نافذة التفاصيل
+        if (!$("detailsModal").classList.contains("hidden")) {
+          if (window.__lastAdminDetailsType) {
+            showAdminStatDetails(window.__lastAdminDetailsType);
+          } else {
+            showAdminStatDetails("today");
+          }
+        }
 
-      // 5) صفحة التصاريح (إن كانت ظاهرة)
-  if (!$("adminPage").classList.contains("hidden")) {
-  const now = Date.now();
-  if (now - lastAuditReloadAt > AUDIT_RELOAD_EVERY_MS) {
-    lastAuditReloadAt = now;
-    await renderAuditLogs();
-  }
-}
-
-
+        // تحديث Audit Logs (داخل adminPage فقط)
+        const now = Date.now();
+        if (now - lastAuditReloadAt > AUDIT_RELOAD_EVERY_MS) {
+          lastAuditReloadAt = now;
+          await renderAuditLogs();
+        }
+      }
     } catch (e) {
       console.error("Polling error:", e);
     } finally {
