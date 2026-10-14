@@ -1643,7 +1643,7 @@ async function loadLogsFromSupabase() {
   isFetchingLogs = true;
 
   try {
-    const { data, error } = await supabaseClient
+    let q = supabaseClient
       .from("gate_logs")
       .select(`
         id,created_at,entry_time,exit_time,
@@ -1654,21 +1654,33 @@ async function loadLogsFromSupabase() {
       .order("created_at", { ascending: false })
       .limit(200);
 
+    // ✅ جلب الجديد فقط
+    if (lastSeenCreatedAt) {
+      q = q.gt("created_at", lastSeenCreatedAt);
+    }
+
+    const { data, error } = await q;
+
     if (error) {
       console.error("خطأ تحميل السجلات:", error);
       return;
     }
-
     if (!data || !data.length) return;
+
+    // حدّث آخر وقت شوفتَه
+    const maxCreated = data.reduce((max, r) => {
+      const t = new Date(r.created_at).getTime();
+      return t > max ? t : max;
+    }, new Date(lastSeenCreatedAt || data[0].created_at).getTime());
+
+    lastSeenCreatedAt = new Date(maxCreated).toISOString();
 
     const newLogs = data.map(dbToLog);
 
-    // بدلاً من unshift/two-way update المعقدة، خلّطهم بالـ id
     const map = new Map(logs.map(l => [String(l.id), l]));
     for (const nl of newLogs) map.set(String(nl.id), nl);
-    logs = Array.from(map.values());
 
-    logs.sort((a, b) => {
+    logs = Array.from(map.values()).sort((a, b) => {
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
@@ -3796,7 +3808,7 @@ function startSecurityPolling() {
     } finally {
       pollingRunning = false;
     }
-  }, 10000);
+ }, 30000);
 }
 
 
