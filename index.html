@@ -2661,7 +2661,7 @@ async function handleScannedQR(qrText){
       block: "start"
     });
 
-    toast("تم التعرف على الاسم بنجاح");
+    toast("تم التعرف على الأسم بنجاح");
   }catch(e){
     console.error("handleScannedQR error:", e);
     stopQRScanner();
@@ -3679,7 +3679,7 @@ function cardPlaceholder(){
 function exportLogs(data,name){
   let rows=data.map(l=>({
     "التاريخ":l.date||"",
-    "الاسم":l.name||"",
+    "الإسم ":l.name||"",
     "الرقم المدني":l.civilId||"",
     "العملية":l.type||"",
     "الحالة":l.status||"",
@@ -3713,6 +3713,50 @@ function exportTodayLogs(){let a=logs.filter(l=>l.date===localDateKey());if(a.le
 function exportAllLogs(){if(logs.length)exportLogs(logs,"جميع_السجلات");else toast("لا توجد سجلات",false)}
 function exportSecurityLogs(){exportLogs(logs,"سجل_الدخول_والخروج")}
 function sendTodayToWhatsApp(){
+  let a = logs.filter(l=>l.date===localDateKey());
+
+  if(!a.length){
+    return toast("لا توجد عمليات اليوم",false);
+  }
+
+  let m = a.map(l => {
+    // ابحث عن الشخص في جدول التصاريح للحصول على الشركة/الجهة
+    const person = people.find(p => String(p.civilId) === String(l.civilId));
+
+    const company = (person && person.company) ? person.company : "-";
+
+    let entryTime = l.timeText || "-";
+    let exitTime  = l.exitTimeText || "لم يسجل خروج";
+    let entryUser = l.securityUser || "غير محدد";
+    let exitUser  = l.exitSecurityUser || "لم يسجل خروج";
+
+    return [
+      `الإسم: ${l.name || "-"}`,
+      `الشركة/الجهة: ${company}`,
+      `الرقم المدني: ${l.civilId || "-"}`,
+      `العملية: ${l.type || "-"}`,
+      `الحالة: ${l.status || "-"}`,
+      `وقت الدخول: ${entryTime}`,
+      `مستخدم تسجيل الدخول: ${entryUser}`,
+      `وقت الخروج: ${exitTime}`,
+      `مستخدم تسجيل الخروج: ${exitUser}`,
+      `السبب: ${l.reason || "-"}`
+    ].join("\n");
+  }).join("\n\n--------------------\n\n");
+
+  let message =
+`تقرير عمليات اليوم
+التاريخ: ${formatDate(localDateKey())}
+
+${m}`;
+
+  window.open(
+    "https://wa.me/?text=" + encodeURIComponent(message),
+    "_blank"
+  );
+}
+
+
 let lastAuditReloadAt = 0;
 const AUDIT_RELOAD_EVERY_MS = 60000; // مرة كل دقيقة
   
