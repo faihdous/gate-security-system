@@ -2661,7 +2661,7 @@ async function handleScannedQR(qrText){
       block: "start"
     });
 
-    toast("تم التعرف على العامل بنجاح");
+    toast("تم التعرف على الاسم بنجاح");
   }catch(e){
     console.error("handleScannedQR error:", e);
     stopQRScanner();
@@ -3679,7 +3679,7 @@ function cardPlaceholder(){
 function exportLogs(data,name){
   let rows=data.map(l=>({
     "التاريخ":l.date||"",
-    "اسم العامل":l.name||"",
+    "الاسم":l.name||"",
     "الرقم المدني":l.civilId||"",
     "العملية":l.type||"",
     "الحالة":l.status||"",
