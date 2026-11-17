@@ -3713,7 +3713,8 @@ function exportTodayLogs(){let a=logs.filter(l=>l.date===localDateKey());if(a.le
 function exportAllLogs(){if(logs.length)exportLogs(logs,"جميع_السجلات");else toast("لا توجد سجلات",false)}
 function exportSecurityLogs(){exportLogs(logs,"سجل_الدخول_والخروج")}
 function sendTodayToWhatsApp(){
-  let a = logs.filter(l=>l.date===localDateKey());
+ let a = logs.filter(l=>l.date===localDateKey()).slice().reverse();
+
 
   if(!a.length){
     return toast("لا توجد عمليات اليوم",false);
